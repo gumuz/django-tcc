@@ -1,16 +1,15 @@
-from django import template
 from django.contrib.contenttypes.models import ContentType
 
 from coffin.template.loader import render_to_string
+from coffin.template import Library 
 
 from tcc import api
 from tcc.forms import CommentForm
 from tcc.settings import CONTENT_TYPES
 
-register = template.Library()
+register = Library()
 
 
-@register.simple_tag(takes_context=True)
 def get_comments_for_object(context, object, next=None):
     ct = ContentType.objects.get_for_model(object)
     if ct.id not in CONTENT_TYPES:
@@ -25,3 +24,4 @@ def get_comments_for_object(context, object, next=None):
     context.update({'comments': comments, 'form': form})
     return render_to_string('tcc/list-comments.html',
                             context_instance=context)
+

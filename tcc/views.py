@@ -5,7 +5,7 @@ from django.core.urlresolvers import reverse
 from django.conf import settings
 from django.http import (HttpResponseBadRequest, HttpResponseRedirect,
                          HttpResponse, Http404)
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import get_object_or_404
 from django.template import RequestContext
 from django.utils import simplejson
 from django.utils.translation import ugettext as _
@@ -51,7 +51,7 @@ def index(request, content_type_id, object_pk):
                 ).order_by('-sortdate', 'path')
     form = _get_comment_form(content_type_id, object_pk)
     context = RequestContext(request, {'comments': comments, 'form': form })
-    return render_to_response('tcc/index.html', context)
+    return render_to_response('threaded_comments/index.html', context)
 
 
 def replies(request, parent_id):
