@@ -49,6 +49,8 @@ def index(request, content_type_id, object_pk):
             'sortdate': 'CASE WHEN tcc_comment.parent_id is null ' \
                 ' THEN tcc_comment.submit_date ELSE T3.submit_date END'}
                 ).order_by('-sortdate', 'path')
+    from framework.utils import orm
+    comments = comments.wrap(orm.id_to_user)
     form = _get_comment_form(content_type_id, object_pk)
     context = RequestContext(request, {'comments': comments, 'form': form })
     return render_to_response('threaded_comments/index.html', context)
