@@ -30,9 +30,11 @@ def _get_tcc_index(comment):
 
 
 def _get_comment_form(content_type_id, object_pk, data=None):
-    if not content_type_id or int(content_type_id) not in get_content_types():
-        raise Http404()
-    ct = get_object_or_404(ContentType, pk=content_type_id)
+    try:
+        ct = ContentType.objects.get_for_id(content_type_id)
+    except ContentType.DoesNotExist:
+        raise Http404('ContentType %s is unknown' % content_type_id)
+
     try:
         target = ct.get_object_for_this_type(pk=object_pk)
     except ObjectDoesNotExist:
