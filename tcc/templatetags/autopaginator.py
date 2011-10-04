@@ -28,15 +28,16 @@ class ParentCommentPaginator(Paginator):
             return Page(self.object_list, number, self)
         bottom = (number - 1) * self.per_page
         # This results in a query to the database ...
-        bottomdate = self.parentcomments[bottom].sortdate
+        bottomdate = self.parentcomments[bottom].limit
         try:
             # This too results in a query to the database ...
-            top = self.parentcomments[bottom+self.per_page-1].sortdate
-            object_list = self.object_list.extra(
-                where=["sortdate between '%s' and '%s'" % (top, bottomdate)])
+            top = self.parentcomments[bottom+self.per_page-1].limit
+            object_list = self.object_list.filter(
+                limit__gte=top,
+                limit__lt=bottomdate,
+            )
         except IndexError:
-            object_list = self.object_list.extra(
-                where=["sortdate <= '%s'" % bottomdate])
+            object_list = self.object_list.filter(limit__gte=bottomdate)
         # And another (final) call to the database 
         return Page(object_list, number, self)
 
