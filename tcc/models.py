@@ -80,7 +80,7 @@ class Comment(models.Model):
     is_public = models.BooleanField(_('Public'), default=True)
     path = models.CharField(_('Path'), unique=True, max_length=MAX_DEPTH*STEPLEN)
     limit = models.DateTimeField(
-        _('Show replies from'), null=True, blank=True)
+        _('Show replies from'), default=datetime.utcnow)
     # subscription (for notification)
     subscribers = models.ManyToManyField(User, related_name="thread_subscribers")
     # denormalized cache
@@ -95,7 +95,7 @@ class Comment(models.Model):
 
     class Meta:
         ordering = ['path']
-        
+
     def get_parsed_comment(self, reparse=settings.DEBUG):
         if reparse:
             signals.comment_will_be_posted.send(
@@ -195,7 +195,7 @@ class Comment(models.Model):
 
             responses = signals.comment_will_be_posted.send(
                 sender = self.__class__, comment = self)
-        
+
             for (receiver, response) in responses:
                 if response == False:
                     raise ValidationError('Comment blocked by `comment_will_be_posted` listener.')
