@@ -104,6 +104,15 @@ class Comment(models.Model):
         safe_comment = mark_safe(parsed_comment)
         return safe_comment
 
+    def __repr__(self):
+        return (u'<%s[%d]: at %s by %s: %r>' % (
+            self.__class__.__name__,
+            self.id,
+            self.submit_date,
+            self.user or self.user_name,
+            self.comment_raw[:50],
+        )).encode('utf-8', 'replace')
+
     def __unicode__(self):
         return u"%05d %s % 8s: %s" % (
             self.id, self.submit_date.isoformat(), self.user.username, self.comment[:20])
