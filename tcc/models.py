@@ -285,7 +285,10 @@ class Comment(models.Model):
         return self.user == user
 
     def can_remove(self, user):
-        return self.user == user or user in self.get_enabled_users('remove')
+        return self.user == user or user.has_perm('delete', self)
+        # Why always fetch all users if you only need to know if a single
+        # user has remove rights?
+        # >>> user in self.get_enabled_users('remove')
 
     def can_restore(self, user):
         return self.user == user
