@@ -78,14 +78,14 @@ def get_comments_disapproved(content_type_id, object_pk, site_id=SITE_ID):
 
 
 def post_comment(content_type_id, object_pk,
-                 user_id, comment, parent_id=None, site_id=SITE_ID):
+                 user_id, comment, ip, parent_id=None, site_id=SITE_ID):
     if parent_id:
         parent = get_comment(parent_id)
         if (not parent) or (not parent.is_open):
             return None
     c = Comment(
         content_type_id=content_type_id, object_pk=object_pk, site_id=site_id,
-        user_id=user_id, comment=comment, parent_id=parent_id)
+        user_id=user_id, comment=comment, parent_id=parent_id, ip_address=ip)
     c.save()
     return c
 
