@@ -37,9 +37,10 @@ def _get_comment_form(content_type_id, object_pk, data=None):
         raise Http404('ContentType %s is unknown' % content_type_id)
 
     try:
-        target = ct.get_object_for_this_type(pk=object_pk)
-    except ObjectDoesNotExist:
-        raise Http404()
+        target = ct.get_object_for_this_type(pk=int(object_pk))
+    except ObjectDoesNotExist, e:
+        raise Http404(e)
+
     initial = {'content_type': ct.id, 'object_pk': object_pk}
     form = CommentForm(target, data, initial=initial)
     return form
@@ -93,7 +94,8 @@ def post(request):
                                    object_pk=object_pk,
                                    user_id=request.user.id,
                                    comment=message,
-                                   parent_id=parent_id)
+                                   parent_id=parent_id,
+                                   ip=request.META['REMOTE_ADDR'])
         if comment:
             if request.is_ajax():
                 context = RequestContext(request, {'c': comment})
@@ -109,8 +111,10 @@ def post(request):
         # TODO: what to do here?
         next = data.get('next', None)
         if not next:
-            next = request.META['HTTP_REFERER']
-        return HttpResponseRedirect(next)
+            # Some firewalls/proxies block referers, don't expect it to be
+            # available
+            next = request.META.get('HTTP_REFERER')
+        return HttpResponseRedirect(next or '/')
 
 
 @login_required
