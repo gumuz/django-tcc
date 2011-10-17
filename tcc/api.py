@@ -4,8 +4,6 @@ from django.core.exceptions import ObjectDoesNotExist
 
 from tcc.models import Comment
 
-SITE_ID = getattr(settings, 'SITE_ID', 1)
-
 
 def make_tree(comments):
     """ Makes a python tree-structure with nested lists of objects
@@ -16,7 +14,7 @@ def make_tree(comments):
     """
     root = []
     levels = []
-    for c in comments.order_by('path'):
+    for c in comments.order_by('parent_id', 'sortdate'):
         c.replies = []
         level = c.depth
         if c.parent:
@@ -36,55 +34,54 @@ def print_tree(tree): # pragma: no cover
         print_tree(n.replies)
 
 
-def get_comments(content_type_id, object_pk, site_id=SITE_ID):
+def get_comments(content_type_id, object_pk):
     return Comment.objects.select_related(
         'user', 'userprofile').filter(
         content_type__id=content_type_id,
         object_pk=object_pk,
-        site__id=site_id)
+    )
 
 
-def get_comments_limited(content_type_id, object_pk, site_id=SITE_ID):
+def get_comments_limited(content_type_id, object_pk):
     return Comment.limited.select_related(
         'user', 'userprofile'
         ).filter(
         content_type__id=content_type_id,
         object_pk=object_pk,
-        site__id=site_id
-        )
+    )
 
 
-def get_comments_as_tree(content_type_id, object_pk, site_id=SITE_ID):
+def get_comments_as_tree(content_type_id, object_pk):
     return make_tree(get_comments(content_type_id=content_type_id,
                                   object_pk=object_pk,
-                                  site_id=site_id))
+                                  ))
 
 
-def get_comments_limited_as_tree(content_type_id, object_pk, site_id=SITE_ID):
+def get_comments_limited_as_tree(content_type_id, object_pk):
     return make_tree( # pragma: no cover
         get_comments_limited(content_type_id=content_type_id,
                              object_pk=object_pk,
-                             site_id=site_id))
+                             ))
 
 
-def get_comments_removed(content_type_id, object_pk, site_id=SITE_ID):
+def get_comments_removed(content_type_id, object_pk):
     return Comment.removed.select_related('user').filter(
         content_type__id=content_type_id, object_pk=object_pk, site__id=site_id)
 
 
-def get_comments_disapproved(content_type_id, object_pk, site_id=SITE_ID):
+def get_comments_disapproved(content_type_id, object_pk):
     return Comment.disapproved.select_related('user').filter(
         content_type__id=content_type_id, object_pk=object_pk, site__id=site_id)
 
 
 def post_comment(content_type_id, object_pk,
-                 user_id, comment, ip, parent_id=None, site_id=SITE_ID):
+                 user_id, comment, ip, parent_id=None):
     if parent_id:
         parent = get_comment(parent_id)
         if (not parent) or (not parent.is_open):
             return None
     c = Comment(
-        content_type_id=content_type_id, object_pk=object_pk, site_id=site_id,
+        content_type_id=content_type_id, object_pk=object_pk, 
         user_id=user_id, comment=comment, parent_id=parent_id, ip_address=ip)
     c.save()
     return c
@@ -229,3 +226,4 @@ def get_user_comments(user_id,
     if site_id:
         extra['site__id'] = site_id
     return Comment.objects.filter(user__id=user_id, **extra)
+

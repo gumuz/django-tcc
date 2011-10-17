@@ -229,5 +229,5 @@ class AutopaginateExtension(Extension):
         except KeyError, AttributeError:
             return {}
 
-
 register.tag(AutopaginateExtension)
+

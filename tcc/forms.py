@@ -25,16 +25,23 @@ class CommentForm(forms.ModelForm):
 
     class Meta:
         model = Comment
-        exclude = ['submit_date', 'is_open', 'is_removed', 'is_approved',
-                   'is_public', 'site', 'limit', 'path', 'user_name',
-                   'user_email', 'user_url', 'comment_raw', 'childcount',
-                   'depth', 'subscribers', 'ip_address', 'sortdate']
+        fields = [
+            'content_type',
+            'object_pk',
+            'parent',
+            'user',
+            'comment',
+            'timestamp',
+            'security_hash',
+            'next',
+            'honeypot',
+        ]
         widgets = {
             'content_type': forms.HiddenInput,
             'object_pk': forms.HiddenInput,
             'user': forms.HiddenInput,
             'parent': forms.HiddenInput,
-            }
+        }
 
     def __init__(self, target_object, data=None, initial=None):
         self.target_object = target_object

@@ -24,9 +24,10 @@ class CurrentCommentManager(Manager):
 
 class LimitedCurrentCommentManager(CurrentCommentManager):
     def get_query_set(self, *args, **kwargs):
-        return super(LimitedCurrentCommentManager, self).get_query_set(
-            *args, **kwargs).filter(
-            Q(parent__isnull=True) | Q(parent__limit__lte=F('submit_date')))
+        return (super(LimitedCurrentCommentManager, self)
+            .get_query_set(*args, **kwargs)
+            #.filter(Q(parent__isnull=True) | Q(parent__limit__lte=F('submit_date')))
+        )
 
 
 class RemovedCommentManager(Manager):

@@ -7,7 +7,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.sites.models import Site
 from django.core.exceptions import ValidationError
 from django.core.urlresolvers import reverse, get_callable
-from django.db import models
+from django.db import models, IntegrityError, transaction
 from django.template.defaultfilters import striptags
 from django.utils.http import base36_to_int, int_to_base36
 from django.utils.translation import ugettext_lazy as _
@@ -28,19 +28,6 @@ SITE_ID = getattr(settings, 'SITE_ID', 1)
 TWO_MINS = timedelta(minutes=2)
 
 
-class Thread(models.Model):
-    content_type = models.ForeignKey(
-        ContentType, verbose_name=_('content type'),
-        related_name="content_type_set_for_tcc_thread")
-    object_pk = models.TextField(_('object id'))
-    content_object = generic.GenericForeignKey(
-        ct_field="content_type", fk_field="object_pk")
-    site = models.ForeignKey(Site, default=SITE_ID,
-                             related_name='tccthreads')
-    is_open = models.BooleanField(_('Open'), default=True)
-    is_moderated = models.BooleanField(_('Moderated'), default=MODERATED)
-
-
 class Comment(models.Model):
     """ A comment table, aimed to be compatible with django.contrib.comments
 
@@ -53,11 +40,9 @@ class Comment(models.Model):
     content_type = models.ForeignKey(
         ContentType, verbose_name=_('content type'),
         related_name="content_type_set_for_tcc_comment")
-    object_pk = models.TextField(_('object id'))
+    object_pk = models.IntegerField(_('object id'))
     content_object = generic.GenericForeignKey(
         ct_field="content_type", fk_field="object_pk")
-    site = models.ForeignKey(Site, default=SITE_ID,
-                             related_name='tcccomments')
     # The actual comment fields
     parent = models.ForeignKey('self', verbose_name= _('Reply to'),
                                null=True, blank=True, related_name='parents')
@@ -78,15 +63,12 @@ class Comment(models.Model):
     # is_public is rather pointless icw is_removed?
     # Keeping it for compatibility w/ contrib.comments
     is_public = models.BooleanField(_('Public'), default=True)
-    path = models.CharField(_('Path'), unique=True, max_length=MAX_DEPTH*STEPLEN)
-    limit = models.DateTimeField(
-        _('Show replies from'), null=True, blank=True, db_index=True)
     # subscription (for notification)
     subscribers = models.ManyToManyField(User, related_name="thread_subscribers")
     # denormalized cache
     childcount = models.IntegerField(_('Reply count'), default=0)
-    depth = models.IntegerField(_('Depth'), default=0)
     sortdate = models.DateTimeField(_('Sortdate'), db_index=True, default=datetime.utcnow)
+    index = models.IntegerField(default=0)
 
     unfiltered = models.Manager()
     objects = CurrentCommentManager()
@@ -95,7 +77,10 @@ class Comment(models.Model):
     disapproved = DisapprovedCommentManager()
 
     class Meta:
-        ordering = ['path']
+        ordering = ['sortdate']
+        unique_together = (
+            ('content_type', 'object_pk', 'parent', 'index'),
+        )
 
     def get_parsed_comment(self, reparse=settings.DEBUG):
         if reparse:
@@ -144,57 +129,33 @@ class Comment(models.Model):
         if identical_msgs.count() > 0:
             raise ValidationError(_("You just posted the exact same content."))
 
-    def get_root_path(self):
-        if self.path:
-            return self.path[0:STEPLEN]
-        # The path isn't save yet: calculate it
-        return self._get_path()[0:STEPLEN]
-
-    # The following two methods may seem superfluous and/or convoluted
-    # but they get the root.id of any 'node' without hitting the
-    # database (again)
-    def get_root_id(self):
-        return base36_to_int(self.get_root_path())
-
-    def get_root_base36(self):
-        return int_to_base36(self.get_root_id())
-
     def get_thread(self):
         """ returns the entire 'thread' (a 'root' comment and all replies)
 
         a root comment is a comment without a parent
         """
-        return Comment.objects.filter(path__startswith=self.get_root_path())
+        return Comment.objects.filter(parent=self)
 
     def get_replies(self, levels=None, include_self=False):
         if self.parent and self.parent.depth == MAX_DEPTH - 1:
             return Comment.objects.none()
         else:
-            replies = Comment.objects.filter(path__startswith=self.path)
+            replies = Comment.objects.filter(parent=self)
             if levels:
                 # 'z' is the highest value in base36 (as implemented in django)
-                replies = replies.filter(path__lte="%s%s" % (self.path, (levels * STEPLEN * 'z')))
+                replies = replies.filter(index__gte=self.childcount-REPLY_LIMIT)
+
             if not include_self:
                 replies = replies.exclude(id=self.id)
             return replies
 
     def get_root(self):
         if self.parent:
-            return Comment.objects.get(path=self.get_root_path())
-        return self
-
-    def get_parents(self):
-        if self.parent:
-            parentpaths = []
-            l = len(self.path)
-            for i in range(0, l, STEPLEN):
-                parentpaths.append(self.path[i:i+STEPLEN])
-            return Comment.objects.filter(path__in=parentpaths)
+            return self.parent
         else:
-            return Comment.objects.none()
+            return self
 
     def save(self, *args, **kwargs):
-
         if self.id:
             is_new = False
         else:
@@ -213,20 +174,45 @@ class Comment(models.Model):
 
         self.clean()
 
-        super(Comment, self).save(*args, **kwargs)
+        index_comments = Comment.unfiltered.filter(
+            object_pk=self.object_pk,
+            content_type=self.content_type_id,
+        ).order_by('-index').values_list('index', flat=True)
+
+        if self.parent_id:
+            index_comments = index_comments.filter(parent=self.parent_id)
+        else:
+            index_comments = index_comments.filter(parent__isnull=True)
+
+        retries = 5
+        while retries:
+            index = list(index_comments[:1])
+            if index:
+                self.index = index[0] + 1
+            else:
+                self.index = 1
+
+            super(Comment, self).save(*args, **kwargs)
+            try:
+                sid = transaction.savepoint()
+                transaction.savepoint_commit(sid)
+                break
+            except IntegrityError:
+                transaction.savepoint_rollback(sid)
+                if not retries:
+                    raise
+
+            retries -= 1
+
+        # We should have an ID by now
+        assert self.id
 
         if is_new:
-
-            self._set_path()
-
-            if REPLY_LIMIT and self.parent:
-                self.parent._set_limit()
-
             if SORT_BY_LATEST_COMMENT:
-                dte = self.submit_date
-                Comment.unfiltered.filter(
-                    path__startswith=self.get_root_path()
-                    ).update(sortdate=dte)
+                (Comment.unfiltered
+                    .filter(id=self.parent_id)
+                    .update(sortdate=self.submit_date)
+                )
             else:
                 # Sort by '(sub)thread-started-date (parent.submit_date)'
                 if self.parent:
@@ -268,7 +254,12 @@ class Comment(models.Model):
         self.save()
 
     def get_depth(self):
-        return ( len(self.path) / STEPLEN ) - 1
+        if self.parent_id:
+            return 1
+        else:
+            return 0
+
+    depth = property(get_depth)
 
     def reply_allowed(self):
         return self.is_open and self.childcount < self.MAX_REPLIES \
@@ -297,33 +288,6 @@ class Comment(models.Model):
 
     def get_base36(self):
         return int_to_base36(self.id)
-
-    def _get_path(self):
-        if self.parent:
-            return "%s%s" % (self.parent.path, self.get_base36().zfill(STEPLEN))
-        else:
-            return "%s" % (self.get_base36().zfill(STEPLEN))
-
-    def _set_path(self):
-        """ This will set the path to a base36 encoding of the comment-id
-
-        >>> 2**31
-        2147483648
-        >>> 2**31 / 1000 / 1000
-        2147
-
-        So 2**31 is enough for 1 million (1.000.000) comments daily for almost 6 (5.88) years
-
-        If you really need more check out django's BigIntegerField
-
-        >>> 2**63
-        9223372036854775808L
-
-        """
-        self.path = self._get_path()
-        self.depth = self.get_depth()
-
-        self.save()
 
     def get_enabled_users(self, action):
         if not callable(ADMIN_CALLBACK):
