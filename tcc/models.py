@@ -4,23 +4,16 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.contenttypes import generic
 from django.contrib.contenttypes.models import ContentType
-from django.contrib.sites.models import Site
 from django.core.exceptions import ValidationError
 from django.core.urlresolvers import reverse, get_callable
-from django.db import models, IntegrityError, transaction
+from django.db import models
 from django.template.defaultfilters import striptags
-from django.utils.http import base36_to_int, int_to_base36
+from django.utils.http import int_to_base36
 from django.utils.translation import ugettext_lazy as _
 
-from tcc.managers import (
-    CurrentCommentManager, LimitedCurrentCommentManager,
-    RemovedCommentManager, DisapprovedCommentManager,
-    )
+from tcc import managers
 from tcc import signals
-from tcc.settings import (
-    STEPLEN, COMMENT_MAX_LENGTH, MODERATED, REPLY_LIMIT, MAX_DEPTH,
-    MAX_REPLIES, ADMIN_CALLBACK, SUBSCRIBE_ON_POST, SORT_BY_LATEST_COMMENT
-    )
+from tcc import settings as tcc_settings
 from django.utils.safestring import mark_safe
 
 SITE_ID = getattr(settings, 'SITE_ID', 1)
@@ -33,8 +26,8 @@ class Comment(models.Model):
 
     """
     # constants
-    MAX_REPLIES = MAX_REPLIES
-    REPLY_LIMIT = REPLY_LIMIT
+    MAX_REPLIES = tcc_settings.MAX_REPLIES
+    REPLY_LIMIT = tcc_settings.REPLY_LIMIT
 
     # From comments BaseCommentAbstractModel
     content_type = models.ForeignKey(
@@ -45,7 +38,7 @@ class Comment(models.Model):
         ct_field="content_type", fk_field="object_pk")
     # The actual comment fields
     parent = models.ForeignKey('self', verbose_name= _('Reply to'),
-                               null=True, blank=True, related_name='parents')
+                               null=True, blank=True, related_name='children')
     user = models.ForeignKey(User, verbose_name='Commenter')
     # These are here mainly for backwards compatibility
     ip_address = models.IPAddressField(default='127.0.0.1')
@@ -54,30 +47,30 @@ class Comment(models.Model):
     user_url    = models.URLField(_("user's URL"), blank=True)
     submit_date = models.DateTimeField(_('Date'), db_index=True, default=datetime.utcnow)
     # Protip: Use postgres...
-    comment = models.TextField(_('Comment'), max_length=COMMENT_MAX_LENGTH)
-    comment_raw = models.TextField(_('Raw Comment'), max_length=COMMENT_MAX_LENGTH)
+    comment = models.TextField(_('Comment'), max_length=tcc_settings.COMMENT_MAX_LENGTH)
+    comment_raw = models.TextField(_('Raw Comment'), max_length=tcc_settings.COMMENT_MAX_LENGTH)
     # still accepting replies?
     is_open = models.BooleanField(_('Open'), default=True)
     is_removed = models.BooleanField(_('Removed'), default=False)
-    is_approved = models.BooleanField(_('Approved'), default=not MODERATED)
+    is_approved = models.BooleanField(_('Approved'), default=not tcc_settings.MODERATED)
     # is_public is rather pointless icw is_removed?
     # Keeping it for compatibility w/ contrib.comments
     is_public = models.BooleanField(_('Public'), default=True)
     # subscription (for notification)
     subscribers = models.ManyToManyField(User, related_name="thread_subscribers")
     # denormalized cache
-    childcount = models.IntegerField(_('Reply count'), default=0)
-    sortdate = models.DateTimeField(_('Sortdate'), db_index=True, default=datetime.utcnow)
+    child_count = models.IntegerField(_('Reply count'), default=0)
+    sort_date = models.DateTimeField(_('Sortdate'), db_index=True, default=datetime.utcnow)
     index = models.IntegerField(default=0)
 
-    unfiltered = models.Manager()
-    objects = CurrentCommentManager()
-    limited = LimitedCurrentCommentManager()
-    removed = RemovedCommentManager()
-    disapproved = DisapprovedCommentManager()
+    unfiltered = managers.CommentManager()
+    objects = managers.CurrentCommentManager()
+    limited = managers.LimitedCurrentCommentManager()
+    removed = managers.RemovedCommentManager()
+    disapproved = managers.DisapprovedCommentManager()
 
     class Meta:
-        ordering = ['sortdate']
+        ordering = ['sort_date']
         unique_together = (
             ('content_type', 'object_pk', 'parent', 'index'),
         )
@@ -95,13 +88,13 @@ class Comment(models.Model):
             self.__class__.__name__,
             self.id,
             self.submit_date,
-            self.user or self.user_name,
+            self.user_name,
             self.comment_raw[:50],
         )).encode('utf-8', 'replace')
 
     def __unicode__(self):
         return u"%05d %s % 8s: %s" % (
-            self.id, self.submit_date.isoformat(), self.user.username, self.comment[:20])
+            self.id, self.submit_date.isoformat(), self.user_name, self.comment[:20])
 
     def get_absolute_url(self):
         link = reverse('tcc_index',
@@ -111,7 +104,7 @@ class Comment(models.Model):
     def clean(self):
 
         if self.parent:
-            if not self.pk and self.parent.childcount >= self.MAX_REPLIES:
+            if not self.pk and self.parent.child_count >= self.MAX_REPLIES:
                 raise ValidationError(_('Maximum number of replies reached'))
         if self.comment <> "" and striptags(self.comment).strip() == "":
             raise ValidationError(_("This field is required."))
@@ -137,13 +130,13 @@ class Comment(models.Model):
         return Comment.objects.filter(parent=self)
 
     def get_replies(self, levels=None, include_self=False):
-        if self.parent and self.parent.depth == MAX_DEPTH - 1:
+        if self.parent and self.parent.depth == tcc_settings.MAX_DEPTH - 1:
             return Comment.objects.none()
         else:
             replies = Comment.objects.filter(parent=self)
             if levels:
                 # 'z' is the highest value in base36 (as implemented in django)
-                replies = replies.filter(index__gte=self.childcount-REPLY_LIMIT)
+                replies = replies.filter(index__gte=self.child_count-tcc_settings.REPLY_LIMIT)
 
             if not include_self:
                 replies = replies.exclude(id=self.id)
@@ -161,12 +154,14 @@ class Comment(models.Model):
         else:
             is_new = True
 
-            if self.comment_raw is None or self.comment_raw == "":
+            # Make sure we always have a raw comment available
+            if self.comment_raw is None or self.comment_raw == '':
                 self.comment_raw = self.comment
 
             responses = signals.comment_will_be_posted.send(
                 sender = self.__class__, comment = self)
 
+            # only save the comment if none of the signals return False
             for (receiver, response) in responses:
                 if response == False:
                     raise ValidationError(
@@ -174,52 +169,35 @@ class Comment(models.Model):
 
         self.clean()
 
-        index_comments = Comment.unfiltered.filter(
-            object_pk=self.object_pk,
-            content_type=self.content_type_id,
-        ).order_by('-index').values_list('index', flat=True)
+        # Find the comment index to use
+        if is_new:
+            comments = Comment.unfiltered.filter(
+                object_pk=self.object_pk,
+                content_type=self.content_type_id,
+            )
 
-        if self.parent_id:
-            index_comments = index_comments.filter(parent=self.parent_id)
-        else:
-            index_comments = index_comments.filter(parent__isnull=True)
+            if self.parent_id:
+                parents = comments.filter(id=self.parent_id)
+                parents.update(
+                    child_count=models.F('child_count') + 1,
+                    sort_date=self.submit_date,
+                )
+                self.index = parents.values_list('child_count', flat=True)[0]
 
-        retries = 5
-        while retries:
-            index = list(index_comments[:1])
-            if index:
-                self.index = index[0] + 1
             else:
-                self.index = 1
+                comments = comments.order_by('-index')
+                indices = list(comments.values_list('index', flat=True)[:1])
+                if indices:
+                    self.index = indices[0]
+                else:
+                    self.index = 1
 
-            super(Comment, self).save(*args, **kwargs)
-            try:
-                sid = transaction.savepoint()
-                transaction.savepoint_commit(sid)
-                break
-            except IntegrityError:
-                transaction.savepoint_rollback(sid)
-                if not retries:
-                    raise
-
-            retries -= 1
+        super(Comment, self).save(*args, **kwargs)
 
         # We should have an ID by now
         assert self.id
 
         if is_new:
-            if SORT_BY_LATEST_COMMENT:
-                (Comment.unfiltered
-                    .filter(id=self.parent_id)
-                    .update(sortdate=self.submit_date)
-                )
-            else:
-                # Sort by '(sub)thread-started-date (parent.submit_date)'
-                if self.parent:
-                    self.sortdate = self.parent.submit_date
-                else:
-                    self.sortdate = self.submit_date
-
             # Sending this signal so *it* can be handled rather than
             # post_save which is triggered 'too soon': before
             # self.path is saved.  If there is an exception in a
@@ -228,12 +206,6 @@ class Comment(models.Model):
             # for a commenting system.
             responses = signals.comment_was_posted.send(
                 sender  = self.__class__, comment = self)
-
-        else:
-
-            # limit needs updating when a message is removed / flagged
-            if REPLY_LIMIT and self.parent:
-                self.parent._set_limit()
 
     def delete(self, *args, **kwargs):
         self.get_replies(include_self=True).delete()
@@ -244,13 +216,13 @@ class Comment(models.Model):
     def _set_limit(self):
         replies = self.get_replies(levels=1).order_by('-submit_date')
         n = replies.count()
-        self.childcount = n
+        self.child_count = n
         if n == 0:
             self.limit = None
-        elif n < REPLY_LIMIT:
+        elif n < tcc_settings.REPLY_LIMIT:
             self.limit = replies[n-1].submit_date
         else:
-            self.limit = replies[REPLY_LIMIT-1].submit_date
+            self.limit = replies[tcc_settings.REPLY_LIMIT-1].submit_date
         self.save()
 
     def get_depth(self):
@@ -262,8 +234,8 @@ class Comment(models.Model):
     depth = property(get_depth)
 
     def reply_allowed(self):
-        return self.is_open and self.childcount < self.MAX_REPLIES \
-            and ( self.depth < MAX_DEPTH - 1 )
+        return self.is_open and self.child_count < self.MAX_REPLIES \
+            and ( self.depth < tcc_settings.MAX_DEPTH - 1 )
 
     def can_open(self, user):
         return self.user == user
@@ -290,9 +262,9 @@ class Comment(models.Model):
         return int_to_base36(self.id)
 
     def get_enabled_users(self, action):
-        if not callable(ADMIN_CALLBACK):
+        if not callable(tcc_settings.ADMIN_CALLBACK):
             return []
         assert action in ['open', 'close', 'remove', 'restore',
                           'approve', 'disapprove']
-        func = get_callable(ADMIN_CALLBACK)
+        func = get_callable(tcc_settings.ADMIN_CALLBACK)
         return func(self, action)

@@ -60,11 +60,11 @@
   {% set prevs = levels %}
   {% set lvl = c.depth %}
   {% if c.parent %}
-    {% set childcount = childcount + 1 %}
+    {% set child_count = childcount + 1 %}
     {% set levels = levels[:lvl] + [lvl] %}
   {% else %}
     {% set levels = [0] %}
-    {% set childcount = 0 %}
+    {% set child_count = 0 %}
   {% endif %}
 
   {# opening / closing of uls and li's #}
@@ -78,7 +78,7 @@
     <span class="comment-reply" style="display:none">
       <a class="small_button" id="post-{{ c.id }}" href="#" title="{% trans %}reply{% endtrans %}">{% trans %}reply{% endtrans %}</a>
     </span>
-    {% if prev.parent.childcount > c.REPLY_LIMIT %}
+    {% if prev.parent.child_count > c.REPLY_LIMIT %}
     <a class="showall" href="{% url tcc_replies prev.parent_id %}" title="{% trans %}Show all{% endtrans %}">
       {% trans %}Show all{% endtrans %}</a>
     {% endif %}
@@ -92,7 +92,7 @@
   {# close the last li (and / or uls) #}
   {% if loop.last %}
   {% if lvl ==  0 %}
-    {% if c.childcount %}
+    {% if c.child_count %}
     <a class="showall" href="{% url tcc_replies c.id %}" title="{% trans %}Show all{% endtrans %}">
       {% trans %}Show all{% endtrans %}</a>
     {% endif %}
@@ -103,7 +103,7 @@
     <span class="comment-reply" style="display:none">
       <a class="small_button" id="post-{{ c.id }}" href="#" title="{% trans %}reply{% endtrans %}">{% trans %}reply{% endtrans %}</a>
     </span>
-    {% if childcount < c.parent.childcount or c.parent.childcount > c.REPLY_LIMIT %}
+    {% if child_count < c.parent.childcount or c.parent.childcount > c.REPLY_LIMIT %}
     <a class="showall" href="{% url tcc_replies c.parent_id %}" title="{% trans %}Show all{% endtrans %}">
       {% trans %}Show all{% endtrans %}</a>
     {% endif %}

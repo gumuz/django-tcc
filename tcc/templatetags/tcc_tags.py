@@ -28,7 +28,7 @@ def get_comments_for_object(context, object, next=None):
     if not comments:
         comments = []
     else:
-        comments = comments.order_by('-sortdate', 'path')
+        comments = comments.order_by('-sort_date', 'path')
     context.update({'comments': comments, 'form': form})
     return render_to_string('tcc/list-comments.html',
                             context_instance=context)

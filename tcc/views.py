@@ -46,7 +46,7 @@ def _get_comment_form(content_type_id, object_pk, data=None):
 
 def index(request, content_type_id, object_pk):
     comments = api.get_comments_limited(
-        content_type_id, object_pk).order_by('-sortdate', 'path')
+        content_type_id, object_pk).order_by('-sort_date', 'path')
     form = _get_comment_form(content_type_id, object_pk)
     context = RequestContext(request, {'comments': comments, 'form': form })
     return render_to_response('tcc/index.html', context)
@@ -66,7 +66,7 @@ def thread(request, thread_id):
     if not comments:
         raise Http404()
     else:
-        comments = comments.order_by('-sortdate', 'path')
+        comments = comments.order_by('-sort_date', 'path')
     rootcomment = comments[0]
     form = _get_comment_form(rootcomment.content_type_id, rootcomment.object_pk)
     context = RequestContext(request, {'comments': comments, 'form': form})

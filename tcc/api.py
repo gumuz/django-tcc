@@ -14,7 +14,7 @@ def make_tree(comments):
     """
     root = []
     levels = []
-    for c in comments.order_by('parent_id', 'sortdate'):
+    for c in comments.order_by('parent_id', 'sort_date'):
         c.replies = []
         level = c.depth
         if c.parent:
