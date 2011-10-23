@@ -4,7 +4,6 @@ except NameError:
     from sets import Set as set
 
 from django.core.paginator import Paginator, Page, InvalidPage
-from django.db.models import F
 from django.http import Http404
 
 from coffin import template
@@ -226,7 +225,7 @@ class AutopaginateExtension(Extension):
                 to_return['getvars'] = ''
 
             return to_return
-        except KeyError, AttributeError:
+        except (KeyError, AttributeError):
             return {}
 
 register.tag(AutopaginateExtension)

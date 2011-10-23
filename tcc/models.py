@@ -130,7 +130,7 @@ class Comment(models.Model):
         return Comment.objects.filter(parent=self)
 
     def get_replies(self, levels=None, include_self=False):
-        if self.parent and self.parent.depth == tcc_settings.MAX_DEPTH - 1:
+        if self.parent_id and self.parent.depth == tcc_settings.MAX_DEPTH - 1:
             return Comment.objects.none()
         else:
             replies = Comment.objects.filter(parent=self)
@@ -147,6 +147,12 @@ class Comment(models.Model):
             return self.parent
         else:
             return self
+
+    def get_related_comments(self):
+        return Comment.unfiltered.filter(
+            object_pk=self.object_pk,
+            content_type=self.content_type_id,
+        )
 
     def save(self, *args, **kwargs):
         if self.id:
@@ -171,10 +177,7 @@ class Comment(models.Model):
 
         # Find the comment index to use
         if is_new:
-            comments = Comment.unfiltered.filter(
-                object_pk=self.object_pk,
-                content_type=self.content_type_id,
-            )
+            comments = self.get_related_comments()
 
             if self.parent_id:
                 parents = comments.filter(id=self.parent_id)
@@ -209,9 +212,22 @@ class Comment(models.Model):
 
     def delete(self, *args, **kwargs):
         self.get_replies(include_self=True).delete()
+
         super(Comment, self).delete(*args, **kwargs)
-        if self.parent:
-            self.parent._set_limit()
+
+        if self.parent_id:
+            comments = self.get_related_comments()
+            
+            comments.filter(id=self.parent_id).update(
+                child_count=models.F('child_count') - 1,
+            )
+
+            comments.filter(
+                parent=self.parent_id,
+                index__gt=self.index,
+            ).update(
+                index=models.F('index') - 1,
+            )
 
     def _set_limit(self):
         replies = self.get_replies(levels=1).order_by('-submit_date')

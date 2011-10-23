@@ -4,15 +4,12 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.core.urlresolvers import reverse
 from django.http import (HttpResponseBadRequest, HttpResponseRedirect,
                          HttpResponse, Http404)
-from django.shortcuts import get_object_or_404
 from django.template import RequestContext
 from django.utils import simplejson
-from django.utils.translation import ugettext as _
 from django.views.decorators.http import require_POST
 
 from tcc import api
 from tcc.forms import CommentForm
-from tcc.utils import get_content_types
 
 # jinja
 from coffin.shortcuts import render_to_response

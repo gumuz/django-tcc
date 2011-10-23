@@ -7,16 +7,42 @@ quote = lambda s: '"%s"' % s
 
 
 class ThreadedCommentsQueryCompiler(compiler.SQLCompiler):
+    '''
+    Query compiler which automatically joins in the subcomments for a given
+    comment.
 
+    We need this because the only kind of `LEFT OUTER JOIN` Django supports is
+    in this form:
+    LEFT OUTER JOIN table
+        ON other_table.column = table.column
+
+    Advanced join clauses which use more than 1 column in the join are not
+    supported.
+    i.e. this is not possible:
+    LEFT OUTER JOIN table
+        ON other_table.column = table.column
+        AND other_table.other_column = table.other_column
+    '''
     @classmethod
     def _get_table_alias(cls, i):
+        '''Returns the table alias
+        
+        >>> ThreadedCommentsQueryCompiler._get_table_alias(0)
+        'sub_0'
+        '''
         return 'sub_%d' % i
 
     @classmethod
     def _get_column_alias(cls, table, column):
+        '''Returns the column alias for the given table/colum.
+        
+        >>> ThreadedCommentsQueryCompiler._get_column_alias('sub_0', 'test')
+        'sub_0_test'
+        '''
         return '%s_%s' % (table, column)
 
     def get_from_clause(self):
+        '''Get the patched from clause which includes the subcomments'''
         from_, f_params = super(ThreadedCommentsQueryCompiler, self) \
             .get_from_clause()
 
@@ -35,19 +61,14 @@ class ThreadedCommentsQueryCompiler(compiler.SQLCompiler):
         return from_, f_params
 
 
-# Patch in our query compiler
+# Django doesn't support manual compilers so we add this to the compiler
+# manually
 compiler.ThreadedCommentsQueryCompiler = ThreadedCommentsQueryCompiler
 
 
 class ThreadedCommentsQuery(models.sql.Query):
+    '''Override the default query to use our compiler'''
     compiler = 'ThreadedCommentsQueryCompiler'
-
-    @classmethod
-    def get_subcomment_table(cls, n):
-        return 'sub_%d' % (n + 1)
-
-    def get_columns(self, table, prefix=''):
-        table = quote(table)
 
 
 class ThreadedCommentsQuerySet(models.query.QuerySet):
@@ -55,6 +76,33 @@ class ThreadedCommentsQuerySet(models.query.QuerySet):
     def _setup_query(self):
         self.query = self.query.clone(ThreadedCommentsQuery)
 
+    def iterator(self):
+        '''Execute the queryset and return the model instances
+
+        This automatically moves the subcomments to the `subcomments`
+        attribute of a comment
+        '''
+        for object_ in super(ThreadedCommentsQuerySet, self).iterator():
+            object_.subcomments = []
+
+            for i in range(settings.REPLY_LIMIT):
+                alias = ThreadedCommentsQueryCompiler._get_table_alias(i)
+
+                columns = {}
+                for field in self.query.model._meta.fields:
+                    column_alias = ThreadedCommentsQueryCompiler \
+                        ._get_column_alias(alias, field.column)
+
+                    columns[field.column] = getattr(object_, column_alias)
+                    delattr(object_, column_alias)
+
+                subcomment = self.model(**columns)
+                if subcomment.pk:
+                    subcomment.subcomments = []
+                    object_.subcomments.insert(0, subcomment)
+            pprint.pprint(object_.__dict__)
+
+            yield object_
 
 class CommentsQuerySet(models.query.QuerySet):
 
@@ -73,7 +121,7 @@ class CommentsQuerySet(models.query.QuerySet):
                     quote(field.column),
                 )
 
-        return qs.extra(select=select)
+        return qs.extra(select=select).filter(parent__isnull=True)
 
     def _clone(self, klass=None, setup=False, **kwargs):
         if klass is None:
@@ -101,16 +149,12 @@ class CurrentCommentManager(CommentManager):
     """
 
     def get_query_set(self, *args, **kwargs):
-        return (
-            super(CurrentCommentManager, self).get_query_set(*args, **kwargs)
-            .filter(
-                is_removed=False,
-                is_approved=True,
-                is_public=True,
-                content_type__id__in=get_content_types(),
-                parent__is_approved=True,
-                parent__is_public=True,
-            )
+        qs = super(CurrentCommentManager, self).get_query_set(*args, **kwargs)
+        return qs.filter(
+            is_removed=False,
+            is_approved=True,
+            is_public=True,
+            content_type__id__in=get_content_types(),
         )
 
 
