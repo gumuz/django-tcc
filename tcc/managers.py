@@ -100,7 +100,6 @@ class ThreadedCommentsQuerySet(models.query.QuerySet):
                 if subcomment.pk:
                     subcomment.subcomments = []
                     object_.subcomments.insert(0, subcomment)
-            pprint.pprint(object_.__dict__)
 
             yield object_
 
