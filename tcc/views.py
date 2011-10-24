@@ -11,6 +11,8 @@ from django.views.decorators.http import require_POST
 from tcc import api
 from tcc.forms import CommentForm
 
+from framework.utils import orm
+
 # jinja
 from coffin.shortcuts import render_to_response
 '''Monkeypatch Django to mimic Jinja2 behaviour'''
@@ -50,7 +52,7 @@ def index(request, content_type_id, object_pk):
 
 
 def replies(request, parent_id):
-    comments = api.get_comment_replies(parent_id)
+    comments = api.get_comment_replies(parent_id).wrap(orm.id_to_user)
     context = RequestContext(request, {'comments': comments})
     return render_to_response('tcc/replies.html', context)
 
