@@ -11,3 +11,4 @@ comment_was_posted = Signal(providing_args=["comment"])
 
 # Sent after a comment was "flagged" in some way.
 comment_was_flagged = Signal(providing_args=["comment"])
+

@@ -4,7 +4,7 @@ from django import forms
 from django.conf import settings
 from django.utils.crypto import salted_hmac, constant_time_compare
 from django.utils.hashcompat import sha_constructor
-from django.utils.translation import ungettext, ugettext_lazy as _
+from django.utils.translation import ugettext_lazy as _
 
 from tcc.models import Comment
 
@@ -20,38 +20,29 @@ class CommentForm(forms.ModelForm):
     honeypot = forms.CharField(
         required=False,
         label=_('If you enter anything in this field '\
-                    'your comment will be treated as spam')
-        )
+                    'your comment will be treated as spam'),
+        widget=forms.HiddenInput,
+    )
+    
+    def __init__(self, data=None, initial=None):
+        self.data = data
+        self.initial = initial or {}
+        self.initial.update(self.generate_security_data())
+        super(CommentForm, self).__init__(data=data, initial=self.initial)
 
-    class Meta:
-        model = Comment
-        fields = [
-            'content_type',
-            'object_pk',
-            'parent',
-            'user',
-            'comment',
-            'timestamp',
-            'security_hash',
-            'next',
-            'honeypot',
-        ]
-        widgets = {
-            'content_type': forms.HiddenInput,
-            'object_pk': forms.HiddenInput,
-            'user': forms.HiddenInput,
-            'parent': forms.HiddenInput,
-        }
+    @property
+    def content_type(self):
+        content_type = self.initial.get('content_type')
+        if not content_type:
+            content_type = self.data['content_type']
+        return content_type
 
-    def __init__(self, target_object, data=None, initial=None):
-        self.target_object = target_object
-        if initial is None:
-            from django.contrib.contenttypes.models import ContentType
-            ct = ContentType.objects.get_for_model(target_object)
-            initial = {'content_type': ct.id}
-        self.content_type = initial['content_type']
-        initial.update(self.generate_security_data())
-        super(CommentForm, self).__init__(data=data, initial=initial)
+    @property
+    def object_pk(self):
+        object_pk = self.initial.get('object_pk')
+        if not object_pk:
+            object_pk = self.data['object_pk']
+        return object_pk
 
     def clean_honeypot(self):
         """Check that nothing's been entered into the honeypot."""
@@ -62,7 +53,7 @@ class CommentForm(forms.ModelForm):
 
     def security_errors(self):
         """Return just those errors associated with security"""
-        errors = ErrorDict()
+        errors = forms.ErrorDict()
         for f in ["honeypot", "timestamp", "security_hash"]:
             if f in self.errors:
                 errors[f] = self.errors[f]
@@ -74,7 +65,7 @@ class CommentForm(forms.ModelForm):
             'content_type' : self.data.get("content_type", ""),
             'object_pk' : self.data.get("object_pk", ""),
             'timestamp' : self.data.get("timestamp", ""),
-            }
+        }
         expected_hash = self.generate_security_hash(**security_hash_dict)
         actual_hash = self.cleaned_data["security_hash"]
         if not constant_time_compare(expected_hash, actual_hash):
@@ -98,10 +89,10 @@ class CommentForm(forms.ModelForm):
         timestamp = int(time.time())
         security_dict =   {
             'content_type'  : str(self.content_type),
-            'object_pk'     : str(self.target_object._get_pk_val()),
+            'object_pk'     : str(self.object_pk),
             'timestamp'     : str(timestamp),
             'security_hash' : self.initial_security_hash(timestamp),
-            }
+        }
         return security_dict
 
     def initial_security_hash(self, timestamp):
@@ -112,9 +103,9 @@ class CommentForm(forms.ModelForm):
 
         initial_security_dict = {
             'content_type' : str(self.content_type),
-            'object_pk' : str(self.target_object._get_pk_val()),
+            'object_pk' : str(self.object_pk),
             'timestamp' : str(timestamp),
-            }
+        }
         return self.generate_security_hash(**initial_security_dict)
 
     def generate_security_hash(self, content_type, object_pk, timestamp):
@@ -131,3 +122,25 @@ class CommentForm(forms.ModelForm):
         # Django 1.2 compatibility
         info = (content_type, object_pk, timestamp, settings.SECRET_KEY)
         return sha_constructor("".join(info)).hexdigest()
+
+
+    class Meta:
+        model = Comment
+        fields = [
+            'content_type',
+            'object_pk',
+            'parent',
+            'user',
+            'comment',
+            'timestamp',
+            'security_hash',
+            'next',
+            'honeypot',
+        ]
+        widgets = {
+            'content_type': forms.HiddenInput,
+            'object_pk': forms.HiddenInput,
+            'user': forms.HiddenInput,
+            'parent': forms.HiddenInput,
+        }
+

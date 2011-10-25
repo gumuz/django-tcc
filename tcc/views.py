@@ -8,8 +8,7 @@ from django.template import RequestContext
 from django.utils import simplejson
 from django.views.decorators.http import require_POST
 
-from tcc import api
-from tcc.forms import CommentForm
+from tcc import api, forms
 
 from framework.utils import orm
 
@@ -27,19 +26,13 @@ def _get_tcc_index(comment):
                    args=[comment.content_type_id, comment.object_pk])
 
 
-def _get_comment_form(content_type_id, object_pk, data=None):
-    try:
-        ct = ContentType.objects.get_for_id(content_type_id)
-    except ContentType.DoesNotExist:
-        raise Http404('ContentType %s is unknown' % content_type_id)
+def _get_comment_form(content_type_id, object_pk, data=None, initial=None):
+    if not initial:
+        initial = {}
 
-    try:
-        target = ct.get_object_for_this_type(pk=int(object_pk))
-    except ObjectDoesNotExist, e:
-        raise Http404(e)
-
-    initial = {'content_type': ct.id, 'object_pk': object_pk}
-    form = CommentForm(target, data, initial=initial)
+    initial['content_type'] = content_type_id
+    initial['object_pk'] = object_pk
+    form = forms.CommentForm(data, initial=initial)
     return form
 
 
@@ -76,24 +69,12 @@ def thread(request, thread_id):
 @require_POST
 def post(request):
     data = request.POST.copy()
-    content_type_id = data.get('content_type', None)
-    object_pk = data.get('object_pk', None)
-    # inject the user
+    # inject the user and IP
     data['user'] = request.user.id
-    form = _get_comment_form(content_type_id, object_pk, data)
+    data['ip'] = request.META['REMOTE_ADDR']
+    form = forms.CommentForm(data)
     if form.is_valid():
-        parent = form.cleaned_data.get('parent', None)
-        if parent:
-            parent_id = parent.id
-        else:
-            parent_id = None
-        message = form.cleaned_data.get('comment', '')
-        comment = api.post_comment(content_type_id=content_type_id,
-                                   object_pk=object_pk,
-                                   user_id=request.user.id,
-                                   comment=message,
-                                   parent_id=parent_id,
-                                   ip=request.META['REMOTE_ADDR'])
+        comment = form.save()
         if comment:
             if request.is_ajax():
                 context = RequestContext(request, {'c': comment})
