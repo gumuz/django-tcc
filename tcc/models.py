@@ -57,7 +57,7 @@ class Comment(models.Model):
     # Keeping it for compatibility w/ contrib.comments
     is_public = models.BooleanField(_('Public'), default=True)
     # subscription (for notification)
-    subscribers = models.ManyToManyField(User, related_name="thread_subscribers")
+    unsubscribers = models.ManyToManyField(User, related_name="thread_unsubscribers")
     # denormalized cache
     child_count = models.IntegerField(_('Reply count'), default=0)
     sort_date = models.DateTimeField(_('Sortdate'), db_index=True, default=datetime.utcnow)
@@ -102,11 +102,12 @@ class Comment(models.Model):
         return "%s#%s" % (link, self.get_base36())
 
     def clean(self):
-
         if self.parent:
             if not self.pk and self.parent.child_count >= self.MAX_REPLIES:
                 raise ValidationError(_('Maximum number of replies reached'))
-        if self.comment <> "" and striptags(self.comment).strip() == "":
+
+        comment = self.comment_raw or self.comment
+        if striptags(comment).strip() == '': 
             raise ValidationError(_("This field is required."))
 
         # Check for identical messages
@@ -114,7 +115,7 @@ class Comment(models.Model):
             user=self.user,
             comment_raw=self.comment,
             submit_date__gte=(datetime.utcnow() - TWO_MINS),
-            )
+        )
 
         if self.id:
             identical_msgs = identical_msgs.exclude(id=self.id)
