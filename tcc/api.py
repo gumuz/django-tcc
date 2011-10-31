@@ -1,5 +1,4 @@
 from django.core.exceptions import ObjectDoesNotExist
-
 from tcc.models import Comment
 
 
@@ -200,14 +199,14 @@ def close_comment(comment_id, user):
 def subscribe(comment_id, user):
     r = get_comment_thread_root(comment_id)
     if r:
-        r.subscribers.add(user)
+        r.unsubscribers.remove(user)
     return r
 
 
 def unsubscribe(comment_id, user):
     r = get_comment_thread_root(comment_id)
     if r:
-        r.subscribers.remove(user)
+        r.unsubscribers.add(user)
     return r
 
 
