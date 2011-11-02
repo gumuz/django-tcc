@@ -22,45 +22,59 @@ TWO_MINS = timedelta(minutes=2)
 
 
 class Comment(models.Model):
-    """ A comment table, aimed to be compatible with django.contrib.comments
 
-    """
+    ''' A comment table, aimed to be compatible with django.contrib.comments
+
+    '''
+
     # constants
     MAX_REPLIES = tcc_settings.MAX_REPLIES
     REPLY_LIMIT = tcc_settings.REPLY_LIMIT
 
     # From comments BaseCommentAbstractModel
-    content_type = models.ForeignKey(
-        ContentType, verbose_name=_('content type'),
-        related_name="content_type_set_for_tcc_comment")
+    content_type = models.ForeignKey(ContentType, verbose_name=_(
+        'content type'), related_name='content_type_set_for_tcc_comment')
     object_pk = models.IntegerField(_('object id'))
-    content_object = generic.GenericForeignKey(
-        ct_field="content_type", fk_field="object_pk")
+    content_object = generic.GenericForeignKey(ct_field='content_type',
+        fk_field='object_pk')
+
     # The actual comment fields
-    parent = models.ForeignKey('self', verbose_name= _('Reply to'),
-                               null=True, blank=True, related_name='children')
+    parent = models.ForeignKey('self', verbose_name=_('Reply to'), null=True,
+        blank=True, related_name='children')
     user = models.ForeignKey(User, verbose_name='Commenter')
+
     # These are here mainly for backwards compatibility
     ip_address = models.IPAddressField(default='127.0.0.1')
-    user_name   = models.CharField(_("user's name"), max_length=50, blank=True)
-    user_email  = models.EmailField(_("user's email address"), blank=True)
-    user_url    = models.URLField(_("user's URL"), blank=True)
-    submit_date = models.DateTimeField(_('Date'), db_index=True, default=datetime.utcnow)
+    user_name = models.CharField(_('user\'s name'), max_length=50, blank=True)
+    user_email = models.EmailField(_('user\'s email address'), blank=True)
+    user_url = models.URLField(_('user\'s URL'), blank=True)
+    submit_date = models.DateTimeField(_('Date'), db_index=True,
+        default=datetime.utcnow)
+
     # Protip: Use postgres...
-    comment = models.TextField(_('Comment'), max_length=tcc_settings.COMMENT_MAX_LENGTH)
-    comment_raw = models.TextField(_('Raw Comment'), max_length=tcc_settings.COMMENT_MAX_LENGTH)
+    comment = models.TextField(_('Comment'),
+        max_length=tcc_settings.COMMENT_MAX_LENGTH)
+    comment_raw = models.TextField(_('Raw Comment'),
+        max_length=tcc_settings.COMMENT_MAX_LENGTH)
+
     # still accepting replies?
     is_open = models.BooleanField(_('Open'), default=True)
     is_removed = models.BooleanField(_('Removed'), default=False)
-    is_approved = models.BooleanField(_('Approved'), default=not tcc_settings.MODERATED)
+    is_approved = models.BooleanField(_('Approved'),
+        default=not tcc_settings.MODERATED)
+
     # is_public is rather pointless icw is_removed?
     # Keeping it for compatibility w/ contrib.comments
     is_public = models.BooleanField(_('Public'), default=True)
+
     # subscription (for notification)
-    unsubscribers = models.ManyToManyField(User, related_name="thread_unsubscribers")
+    unsubscribers = models.ManyToManyField(User,
+        related_name='thread_unsubscribers')
+
     # denormalized cache
     child_count = models.IntegerField(_('Reply count'), default=0)
-    sort_date = models.DateTimeField(_('Sortdate'), db_index=True, default=datetime.utcnow)
+    sort_date = models.DateTimeField(_('Sortdate'), db_index=True,
+        default=datetime.utcnow)
     index = models.IntegerField(default=0)
 
     unfiltered = managers.CommentManager()
@@ -74,6 +88,14 @@ class Comment(models.Model):
         unique_together = (
             ('content_type', 'object_pk', 'parent', 'index'),
         )
+
+    def get_subscribers(self):
+        # get all related comments
+        comments = self.get_comments_in_thread()
+        # get at most `MAX_REPLIES` and the parent thread
+        comments = comments[:tcc_settings.MAX_REPLIES+1]
+        # append the user ids to the list of user_ids
+        return comments.values_list('user_id', flat=True)
 
     def get_parsed_comment(self, reparse=settings.DEBUG):
         if reparse:
@@ -154,6 +176,14 @@ class Comment(models.Model):
             object_pk=self.object_pk,
             content_type=self.content_type_id,
         )
+
+    def get_comments_in_thread(self):
+        qs = self.get_related_comments()
+        if self.parent_id:
+            return (qs.filter(id=self.parent_id)
+                | qs.filter(parent=self.parent_id))
+        else:
+            return qs.filter(id=self.id)
 
     def save(self, *args, **kwargs):
         if self.id:
