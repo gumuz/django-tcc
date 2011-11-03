@@ -17,10 +17,12 @@ urlpatterns = patterns(
     url(r'^unflag/(?P<comment_id>\d+)/$', 'unflag', name='tcc_unflag'),
     url(r'^subscribe/(?P<comment_id>\d+)/$', 'subscribe', name='tcc_subscribe'),
     url(r'^unsubscribe/(?P<comment_id>\d+)/$', 'unsubscribe', name='tcc_unsubscribe'),
-    )
+    url(r'^redirect/(?P<content_type_id>\d+)/(?P<object_pk>\d+)/$',
+        'content_type_redirect', name='content_type_redirect'),
+)
 
 urlpatterns += patterns(
     '',
     url(r'^jsi18n/$', 'django.views.i18n.javascript_catalog',
         {'packages': ['tcc']}, name='tcc_jsi18n'),
-    )
+)

@@ -3,14 +3,14 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.urlresolvers import reverse
 from django.http import (HttpResponseBadRequest, HttpResponseRedirect,
-                         HttpResponse, Http404)
+                         HttpResponse, Http404, HttpResponsePermanentRedirect)
 from django.template import RequestContext
 from django.utils import simplejson
 from django.views.decorators.http import require_POST
 
 from tcc import api, forms
 
-from framework.utils import orm
+from framework.utils import orm, forms as form_utils
 
 # jinja
 from coffin.shortcuts import render_to_response
@@ -84,8 +84,10 @@ def post(request):
                 next = comment.get_absolute_url()
             return HttpResponseRedirect(next)
     if request.is_ajax():
-        return HttpResponseBadRequest(simplejson.dumps(form.errors),
-                                      mimetype="application/json")
+        return HttpResponseBadRequest(
+            form_utils.error_form_serialization(form.errors),
+            mimetype='application/json',
+        )
     else:
         # TODO: what to do here?
         next = data.get('next', None)
@@ -170,3 +172,9 @@ def unsubscribe(request, comment_id):
         tcc_index = _get_tcc_index(comment)
         return HttpResponseRedirect(tcc_index)
     raise Http404()
+
+def content_type_redirect(request, content_type_id, object_pk):
+    content_type = ContentType.objects.get_for_id(content_type_id)
+    object = content_type.get_object_for_this_type(pk=object_pk)
+    return HttpResponsePermanentRedirect(object.get_absolute_url())
+
