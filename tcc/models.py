@@ -222,7 +222,7 @@ class Comment(models.Model):
                 comments = comments.order_by('-index')
                 indices = list(comments.values_list('index', flat=True)[:1])
                 if indices:
-                    self.index = indices[0]
+                    self.index = indices[0] + 1
                 else:
                     self.index = 1
 
