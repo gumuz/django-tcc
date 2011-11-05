@@ -52,6 +52,8 @@ class ThreadedCommentsQueryCompiler(compiler.SQLCompiler):
             LEFT OUTER JOIN %(db_table)s %(alias)s
                 ON %(alias)s.parent_id = %(db_table)s.id
                 AND %(alias)s.index = %(db_table)s.child_count - %(i)d
+                AND %(alias)s.object_pk = %(db_table)s.object_pk - %(i)d
+                AND %(alias)s.content_type_id = %(db_table)s.content_type_id - %(i)d
             ''' % dict(
                 i=i,
                 alias=quote(self._get_table_alias(i)),
