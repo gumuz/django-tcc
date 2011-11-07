@@ -152,7 +152,8 @@ class CurrentCommentManager(CommentManager):
     def get_query_set(self, *args, **kwargs):
         qs = super(CurrentCommentManager, self).get_query_set(*args, **kwargs)
         return qs.filter(
-            is_removed=False,
+            # for consistent behaviour, always show deleted comments too
+            #is_removed=False,
             is_approved=True,
             is_public=True,
             content_type__id__in=get_content_types(),
