@@ -53,7 +53,7 @@ class Comment(models.Model):
     user_email = models.EmailField(_('user\'s email address'), blank=True)
     user_url = models.URLField(_('user\'s URL'), blank=True)
     submit_date = models.DateTimeField(_('Date'), db_index=True,
-        default=datetime.utcnow)
+        default=datetime.now)
 
     # Protip: Use postgres...
     comment = models.TextField(_('Comment'),
@@ -78,7 +78,7 @@ class Comment(models.Model):
     # denormalized cache
     child_count = models.IntegerField(_('Reply count'), default=0)
     sort_date = models.DateTimeField(_('Sortdate'), db_index=True,
-        default=datetime.utcnow)
+        default=datetime.now)
     index = models.IntegerField(default=0)
 
     unfiltered = managers.CommentManager()
@@ -140,7 +140,7 @@ class Comment(models.Model):
         identical_msgs = Comment.objects.filter(
             user=self.user,
             comment_raw=self.comment,
-            submit_date__gte=(datetime.utcnow() - TWO_MINS),
+            submit_date__gte=(datetime.now() - TWO_MINS),
         )
 
         if self.id:
