@@ -122,7 +122,10 @@ class CommentsQuerySet(models.query.QuerySet):
                     quote(field.column),
                 )
 
-        return qs.extra(select=select).filter(parent__isnull=True)
+        return qs.extra(select=select).filter(
+            parent__isnull=True,
+            is_removed=False,
+        )
 
     def _clone(self, klass=None, setup=False, **kwargs):
         if klass is None:

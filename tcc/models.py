@@ -13,6 +13,7 @@ from django.utils.translation import ugettext_lazy as _
 
 from tcc import managers
 from tcc import signals
+from tcc import utils
 from tcc import settings as tcc_settings
 from django.utils.safestring import mark_safe
 
@@ -32,8 +33,12 @@ class Comment(models.Model):
     REPLY_LIMIT = tcc_settings.REPLY_LIMIT
 
     # From comments BaseCommentAbstractModel
-    content_type = models.ForeignKey(ContentType, verbose_name=_(
-        'content type'), related_name='content_type_set_for_tcc_comment')
+    content_type = models.ForeignKey(ContentType,
+        verbose_name=_('content type'),
+        related_name='content_type_set_for_tcc_comment',
+        limit_choices_to={'id__in':
+            (ct.id for ct in utils.get_content_types())},
+    )
     object_pk = models.IntegerField(_('object id'))
     content_object = generic.GenericForeignKey(ct_field='content_type',
         fk_field='object_pk')
@@ -120,7 +125,7 @@ class Comment(models.Model):
 
     def get_absolute_url(self):
         link = reverse('tcc_index',
-                       args=(self.content_type.id, self.object_pk))
+                       args=(self.content_type_id, self.object_pk))
         return "%s#%s" % (link, self.get_base36())
 
     def clean(self):
