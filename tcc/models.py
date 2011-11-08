@@ -48,7 +48,7 @@ class Comment(models.Model):
     user = models.ForeignKey(User, verbose_name='Commenter')
 
     # These are here mainly for backwards compatibility
-    ip_address = models.IPAddressField(default='127.0.0.1')
+    ip_address = models.IPAddressField()
     user_name = models.CharField(_('user\'s name'), max_length=50, blank=True)
     user_email = models.EmailField(_('user\'s email address'), blank=True)
     user_url = models.URLField(_('user\'s URL'), blank=True)

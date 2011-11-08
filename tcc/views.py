@@ -71,8 +71,7 @@ def post(request):
     data = request.POST.copy()
     # inject the user and IP
     data['user'] = request.user.id
-    data['ip'] = request.META['REMOTE_ADDR']
-    form = forms.CommentForm(data)
+    form = forms.CommentForm(data, ip=request.META['REMOTE_ADDR'])
     if form.is_valid():
         comment = form.save()
         if comment:

@@ -24,11 +24,20 @@ class CommentForm(forms.ModelForm):
         widget=forms.HiddenInput,
     )
     
-    def __init__(self, data=None, initial=None):
+    def __init__(self, data=None, initial=None, ip=None):
         self.data = data
         self.initial = initial or {}
         self.initial.update(self.generate_security_data())
+        self.ip = ip
         super(CommentForm, self).__init__(data=data, initial=self.initial)
+
+    def save(self, commit=True):
+        instance = forms.ModelForm.save(self, commit=False)
+        assert self.ip, 'Unable to save without an IP address'
+        instance.ip_address = self.ip
+        if commit:
+            instance.save()
+        return instance
 
     @property
     def content_type(self):
