@@ -36,8 +36,7 @@ class Comment(models.Model):
     content_type = models.ForeignKey(ContentType,
         verbose_name=_('content type'),
         related_name='content_type_set_for_tcc_comment',
-        limit_choices_to={'id__in':
-            (ct.id for ct in utils.get_content_types())},
+        limit_choices_to=utils.get_content_types_q(),
     )
     object_pk = models.IntegerField(_('object id'))
     content_object = generic.GenericForeignKey(ct_field='content_type',
