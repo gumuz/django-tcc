@@ -3,16 +3,28 @@ from django.db import models
 from tcc.settings import CONTENT_TYPES
 import operator
 
-_CONTENT_TYPES = None
+_CONTENT_TYPES_MAP = None
+
+def get_content_types_map():
+    global _CONTENT_TYPES_MAP
+    if not _CONTENT_TYPES_MAP:
+        _CONTENT_TYPES_MAP = {}
+        for label in CONTENT_TYPES:
+            app, model = label.split('.')
+            ct = ContentType.objects.get_by_natural_key(app, model)
+            _CONTENT_TYPES_MAP[label] = ct.id
+            if app not in _CONTENT_TYPES_MAP:
+                _CONTENT_TYPES_MAP[app] = {}
+
+            _CONTENT_TYPES_MAP[app][model] = ct.id
+    return _CONTENT_TYPES_MAP
+
+def get_content_type_id(label):
+    return get_content_types_map().get(label)
 
 def get_content_types():
-    global _CONTENT_TYPES
-    if not _CONTENT_TYPES:
-        _CONTENT_TYPES = []
-        for label in CONTENT_TYPES:
-            ct = ContentType.objects.get_by_natural_key(*label.split("."))
-            _CONTENT_TYPES.append(ct.id)
-    return _CONTENT_TYPES
+    return [v for v in get_content_types_map().itervalues()
+        if isinstance(v, (int, long))]
 
 def get_content_types_q():
     qs = []
