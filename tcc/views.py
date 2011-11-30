@@ -88,14 +88,11 @@ def post(request):
             mimetype='application/json',
         )
     else:
-        # TODO: what to do here?
-        next = data.get('next', None)
-        if not next:
-            # Some firewalls/proxies block referers, don't expect it to be
-            # available
-            next = request.META.get('HTTP_REFERER')
-        return HttpResponseRedirect(next or '/')
-
+        return content_type_redirect(
+            request,
+            content_type_id=data.get('content_type_id'),
+            object_pk=data.get('object_pk'),
+        )
 
 @login_required
 @require_POST
