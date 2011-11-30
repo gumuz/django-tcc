@@ -175,5 +175,7 @@ def unsubscribe(request, comment_id):
 def content_type_redirect(request, content_type_id, object_pk):
     content_type = ContentType.objects.get_for_id(content_type_id)
     object = content_type.get_object_for_this_type(pk=object_pk)
-    return HttpResponsePermanentRedirect(object.get_absolute_url())
+
+    url_method = getattr(object, 'get_comment_url', object.get_absolute_url)
+    return HttpResponsePermanentRedirect(url_method())
 
