@@ -3,12 +3,12 @@ from tcc.models import Comment
 
 
 def make_tree(comments):
-    """ Makes a python tree-structure with nested lists of objects
+    ''' Makes a python tree-structure with nested lists of objects
 
     Loops the queryset
 
     Large threads will consume quite a bit of memory
-    """
+    '''
     root = []
     levels = []
     for c in comments.order_by('parent_id', 'sort_date'):
@@ -76,7 +76,7 @@ def post_comment(content_type_id, object_pk,
     if parent_id:
         parent = get_comment(parent_id)
         if (not parent) or (not parent.is_open):
-            return None
+            return
     c = Comment(
         content_type_id=content_type_id, object_pk=object_pk, 
         user_id=user_id, comment=comment, parent_id=parent_id, ip_address=ip)
@@ -85,10 +85,10 @@ def post_comment(content_type_id, object_pk,
 
 
 def post_reply(parent_id, user_id, comment):
-    """ Shortcut for post_comment if there is a parent_id """
+    ''' Shortcut for post_comment if there is a parent_id '''
     parent = get_comment(parent_id)
     if (not parent) or (not parent.is_open) or (not parent.reply_allowed()):
-        return None
+        return
     c = Comment(
         content_type_id=parent.content_type_id, object_pk=parent.object_pk,
         site_id=parent.site_id, user_id=user_id, comment=comment,
@@ -101,7 +101,7 @@ def get_comment(comment_id):
     try:
         return Comment.objects.get(id=comment_id)
     except ObjectDoesNotExist:
-        return None
+        return
 
 
 def get_comment_thread(comment_id):
@@ -126,71 +126,89 @@ def get_comment_thread_root(comment_id):
         return c.get_root()
 
 
+def remove_spam_comment(comment_id, user):
+    ''' mark comment as spam and remove if the user has the rights'''
+    c = get_comment(comment_id)
+    if c:
+        if c.can_report_spam(user):
+            c.spam_report_count += 1
+
+            if c.can_remove_spam(user):
+                c.is_spam = True
+                c.is_removed = True
+
+            c.save()
+
+        else:
+            return
+    return c
+
+
 def remove_comment(comment_id, user):
-    """ mark comment as removed """
+    ''' mark comment as removed '''
     c = get_comment(comment_id)
     if c:
         if not c.can_remove(user):
-            return None
+            return
         c.is_removed = True
         c.save()
     return c
 
 
 def restore_comment(comment_id, user):
-    """ restore remove comment """
+    ''' restore remove comment '''
     try:
         c = Comment.unfiltered.get(id=comment_id)
         if not c.can_restore(user):
-            return None
+            return
         c.is_removed = False
         c.save()
         return c
     except Comment.DoesNotExist:
-        return None
+        return
 
 
 def disapprove_comment(comment_id, user):
-    """ disapprove comment """
+    ''' disapprove comment '''
     c = get_comment(comment_id)
     if c:
         if not c.can_disapprove(user):
-            return None
+            return
         c.is_approved = False
         c.save()
     return c
 
 
 def approve_comment(comment_id, user):
-    """ approve comment """
+    ''' approve comment '''
     try:
         c = Comment.unfiltered.get(id=comment_id)
         if not c.can_approve(user):
-            return None
+            return
         c.is_approved = True
         c.save()
         return c
     except Comment.DoesNotExist:
-        return None
+        return
 
 
 def open_comment(comment_id, user):
-    """ Mark comment 'open' (replies welcome) """
+    ''' Mark comment 'open' (replies welcome) '''
     c = get_comment(comment_id)
     if c:
         if not c.can_open(user):
-            return None
+            return
         c.is_open = True
         c.save()
     return c
 
 
 def close_comment(comment_id, user):
-    """ Mark a comment as closed (no more replies possible) """
+    ''' Mark a comment as closed (no more replies possible) '''
     c = get_comment(comment_id)
     if c:
         if not c.can_close(user):
-            return None
+            return
         c.is_open = False
         c.save()
     return c
@@ -212,7 +230,7 @@ def unsubscribe(comment_id, user):
 
 def get_user_comments(user_id,
                       content_type_id=None, object_pk=None, site_id=None):
-    """ Returns all (approved, unremoved) comments by user """
+    ''' Returns all (approved, unremoved) comments by user '''
     extra = {}
     if content_type_id:
         extra['content_type__id'] = content_type_id

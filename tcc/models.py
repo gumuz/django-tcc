@@ -70,6 +70,8 @@ class Comment(models.Model):
     # is_public is rather pointless icw is_removed?
     # Keeping it for compatibility w/ contrib.comments
     is_public = models.BooleanField(_('Public'), default=True)
+    is_spam = models.BooleanField(_('Spam'), default=True)
+    spam_report_count = models.IntegerField(_('Spam reports'), default=0)
 
     # subscription (for notification)
     unsubscribers = models.ManyToManyField(User,
@@ -189,7 +191,14 @@ class Comment(models.Model):
         else:
             return qs.filter(id=self.id)
 
-    def save(self, *args, **kwargs):
+    def save(self, simple=False, *args, **kwargs):
+        '''save the comment and add the index, update the parent child count
+        
+        simple -- only save, don't do any magic
+        '''
+        if simple:
+            super(Comment, self).save(*args, **kwargs)
+
         if self.id:
             is_new = False
         else:
@@ -300,6 +309,11 @@ class Comment(models.Model):
     def can_disapprove(self, user):
         return self.user == user
 
+    def can_report_spam(self, user):
+        # we might want to limit this later, but for now every user can
+        # report spam
+        return user.is_authenticated()
+
     def can_remove(self, user):
         return (
             self.user == user
@@ -330,3 +344,8 @@ class Comment(models.Model):
                           'approve', 'disapprove']
         func = get_callable(tcc_settings.ADMIN_CALLBACK)
         return func(self, action)
+
+class SpamReport(models.Model):
+    comment = models.ForeignKey(Comment)
+    user = models.ForeignKey(User)
+
