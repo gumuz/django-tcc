@@ -21,6 +21,16 @@ SITE_ID = getattr(settings, 'SITE_ID', 1)
 TWO_MINS = timedelta(minutes=2)
 
 
+class Subscribtion(models.Model):
+    user = models.ForeignKey(User)
+    comment = models.ForeignKey('Comment')
+    read_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    class Meta:
+        unique_together = (
+            ('user', 'comment'),
+        )
+
 class Comment(models.Model):
 
     ''' A comment table, aimed to be compatible with django.contrib.comments
@@ -28,13 +38,17 @@ class Comment(models.Model):
     '''
 
     # constants
+
     MAX_REPLIES = tcc_settings.MAX_REPLIES
     REPLY_LIMIT = tcc_settings.REPLY_LIMIT
 
     # From comments BaseCommentAbstractModel
-    content_type = models.ForeignKey(ContentType, verbose_name=_(
-        'content type'), related_name='content_type_set_for_tcc_comment')
-    object_pk = models.IntegerField(_('object id'))
+    content_type = models.ForeignKey(
+        ContentType,
+        verbose_name=_('content type'),
+        related_name='content_type_set_for_tcc_comment',
+    )
+    object_pk = models.IntegerField(_('object id'), blank=True, null=True)
     content_object = generic.GenericForeignKey(ct_field='content_type',
         fk_field='object_pk')
 
@@ -70,6 +84,11 @@ class Comment(models.Model):
     # subscription (for notification)
     unsubscribers = models.ManyToManyField(User,
         related_name='thread_unsubscribers')
+    subscribers = models.ManyToManyField(
+        User,
+        through=Subscribtion,
+        related_name='comment_subscribtions',
+    )
 
     # denormalized cache
     child_count = models.IntegerField(_('Reply count'), default=0)
