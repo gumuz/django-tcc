@@ -88,14 +88,11 @@ def post(request):
             mimetype='application/json',
         )
     else:
-        # TODO: what to do here?
-        next = data.get('next', None)
-        if not next:
-            # Some firewalls/proxies block referers, don't expect it to be
-            # available
-            next = request.META.get('HTTP_REFERER')
-        return HttpResponseRedirect(next or '/')
-
+        return content_type_redirect(
+            request,
+            content_type_id=data.get('content_type_id'),
+            object_pk=data.get('object_pk'),
+        )
 
 @login_required
 @require_POST
@@ -187,5 +184,7 @@ def unsubscribe(request, comment_id):
 def content_type_redirect(request, content_type_id, object_pk):
     content_type = ContentType.objects.get_for_id(content_type_id)
     object = content_type.get_object_for_this_type(pk=object_pk)
-    return HttpResponsePermanentRedirect(object.get_absolute_url())
+
+    url_method = getattr(object, 'get_comment_url', object.get_absolute_url)
+    return HttpResponsePermanentRedirect(url_method())
 

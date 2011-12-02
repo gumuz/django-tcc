@@ -124,10 +124,12 @@ class Comment(models.Model):
         return u"%05d %s % 8s: %s" % (
             self.id, self.submit_date.isoformat(), self.user_name, self.comment[:20])
 
+    @models.permalink
     def get_absolute_url(self):
-        link = reverse('tcc_index',
-                       args=(self.content_type_id, self.object_pk))
-        return "%s#%s" % (link, self.get_base36())
+        return ('content_type_redirect', (), {
+            'content_type_id': self.content_type_id,
+            'object_pk': self.object_pk,
+        })
 
     def clean(self):
         if self.parent:
