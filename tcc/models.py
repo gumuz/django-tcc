@@ -13,6 +13,7 @@ from django.utils.translation import ugettext_lazy as _
 
 from tcc import managers
 from tcc import signals
+from tcc import utils
 from tcc import settings as tcc_settings
 from django.utils.safestring import mark_safe
 
@@ -43,12 +44,12 @@ class Comment(models.Model):
     REPLY_LIMIT = tcc_settings.REPLY_LIMIT
 
     # From comments BaseCommentAbstractModel
-    content_type = models.ForeignKey(
-        ContentType,
+    content_type = models.ForeignKey(ContentType,
         verbose_name=_('content type'),
         related_name='content_type_set_for_tcc_comment',
+        limit_choices_to=utils.get_content_types_q(),
     )
-    object_pk = models.IntegerField(_('object id'), blank=True, null=True)
+    object_pk = models.IntegerField(_('object id'))
     content_object = generic.GenericForeignKey(ct_field='content_type',
         fk_field='object_pk')
 
@@ -58,12 +59,12 @@ class Comment(models.Model):
     user = models.ForeignKey(User, verbose_name='Commenter')
 
     # These are here mainly for backwards compatibility
-    ip_address = models.IPAddressField(default='127.0.0.1')
+    ip_address = models.IPAddressField()
     user_name = models.CharField(_('user\'s name'), max_length=50, blank=True)
     user_email = models.EmailField(_('user\'s email address'), blank=True)
     user_url = models.URLField(_('user\'s URL'), blank=True)
     submit_date = models.DateTimeField(_('Date'), db_index=True,
-        default=datetime.utcnow)
+        default=datetime.now)
 
     # Protip: Use postgres...
     comment = models.TextField(_('Comment'),
@@ -93,7 +94,7 @@ class Comment(models.Model):
     # denormalized cache
     child_count = models.IntegerField(_('Reply count'), default=0)
     sort_date = models.DateTimeField(_('Sortdate'), db_index=True,
-        default=datetime.utcnow)
+        default=datetime.now)
     index = models.IntegerField(default=0)
 
     unfiltered = managers.CommentManager()
@@ -137,10 +138,12 @@ class Comment(models.Model):
         return u"%05d %s % 8s: %s" % (
             self.id, self.submit_date.isoformat(), self.user_name, self.comment[:20])
 
+    @models.permalink
     def get_absolute_url(self):
-        link = reverse('tcc_index',
-                       args=(self.content_type.id, self.object_pk))
-        return "%s#%s" % (link, self.get_base36())
+        return ('content_type_redirect', (), {
+            'content_type_id': self.content_type_id,
+            'object_pk': self.object_pk,
+        })
 
     def clean(self):
         if self.parent:
@@ -148,14 +151,14 @@ class Comment(models.Model):
                 raise ValidationError(_('Maximum number of replies reached'))
 
         comment = self.comment_raw or self.comment
-        if striptags(comment).strip() == '': 
+        if striptags(comment).strip() == '':
             raise ValidationError(_("This field is required."))
 
         # Check for identical messages
         identical_msgs = Comment.objects.filter(
             user=self.user,
             comment_raw=self.comment,
-            submit_date__gte=(datetime.utcnow() - TWO_MINS),
+            submit_date__gte=(datetime.now() - TWO_MINS),
         )
 
         if self.id:
@@ -267,7 +270,7 @@ class Comment(models.Model):
 
         if self.parent_id:
             comments = self.get_related_comments()
-            
+
             comments.filter(id=self.parent_id).update(
                 child_count=models.F('child_count') - 1,
             )
@@ -316,7 +319,18 @@ class Comment(models.Model):
         return self.user == user
 
     def can_remove(self, user):
-        return self.user == user or user.has_perm('delete', self)
+        return (
+            self.user == user
+            or (
+                self.content_type_id == utils.get_content_type_id('auth.user')
+                and self.object_pk == user.id
+            )
+            or (
+                self.content_type_id == utils.get_content_type_id('lists.userlist')
+                and self.content_object.user_id == user.id
+            )
+            or user.has_perm('delete', self)
+        )
         # Why always fetch all users if you only need to know if a single
         # user has remove rights?
         # >>> user in self.get_enabled_users('remove')
