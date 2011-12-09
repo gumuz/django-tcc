@@ -354,3 +354,6 @@ class SpamReport(models.Model):
     comment = models.ForeignKey(Comment)
     user = models.ForeignKey(User)
 
+    class Meta:
+        unique_together = ['user', 'comment']
+
