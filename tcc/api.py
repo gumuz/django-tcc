@@ -1,5 +1,5 @@
 from django.core.exceptions import ObjectDoesNotExist
-from tcc.models import Comment
+from tcc.models import Comment, SpamReport
 
 
 def make_tree(comments):
@@ -131,7 +131,13 @@ def remove_spam_comment(comment_id, user):
     c = get_comment(comment_id)
     if c:
         if c.can_report_spam(user):
-            c.spam_report_count += 1
+            spam_report, created = SpamReport.objects.get_or_create(
+                comment=c,
+                user=user,
+            )
+
+            if created:
+                c.spam_report_count += 1
 
             if c.can_remove_spam(user):
                 c.is_spam = True
