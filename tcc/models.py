@@ -316,6 +316,9 @@ class Comment(models.Model):
         # report spam
         return user.is_authenticated()
 
+    def can_remove_spam(self, user):
+        return self.can_remove(user)
+
     def can_remove(self, user):
         return (
             self.user == user
