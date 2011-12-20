@@ -12,10 +12,12 @@ from tcc import api, forms
 
 from framework.utils import orm, forms as form_utils
 
-# jinja
+  # jinja
 from coffin.shortcuts import render_to_response
 '''Monkeypatch Django to mimic Jinja2 behaviour'''
 from django.utils import safestring
+
+
 if not hasattr(safestring, '__html__'):
     safestring.SafeString.__html__ = lambda self: str(self)
     safestring.SafeUnicode.__html__ = lambda self: unicode(self)
@@ -51,9 +53,9 @@ def replies(request, parent_id):
 
 
 def thread(request, thread_id):
-    # thead_id here should be the root_id of the thread (even though
-    # any comment_id will work) so the entire thread can cached *and*
-    # invalidated with one entry
+  # thead_id here should be the root_id of the thread (even though
+  # any comment_id will work) so the entire thread can cached *and*
+  # invalidated with one entry
     comments = api.get_comment_thread(thread_id)
     if not comments:
         raise Http404()
@@ -69,7 +71,7 @@ def thread(request, thread_id):
 @require_POST
 def post(request):
     data = request.POST.copy()
-    # inject the user and IP
+  # inject the user and IP
     data['user'] = request.user.id
     form = forms.CommentForm(data, ip=request.META['REMOTE_ADDR'])
     if form.is_valid():
@@ -93,6 +95,7 @@ def post(request):
             content_type_id=data.get('content_type_id'),
             object_pk=data.get('object_pk'),
         )
+
 
 @login_required
 @require_POST
@@ -131,7 +134,7 @@ def remove(request, comment_id):
     comment = api.remove_comment(comment_id, request.user)
     if comment:
         if request.is_ajax():
-            return HttpResponse() # 200 OK
+            return HttpResponse()  # 200 OK
         tcc_index = _get_tcc_index(comment)
         return HttpResponseRedirect(tcc_index)
     raise Http404()
@@ -152,7 +155,7 @@ def subscribe(request, comment_id):
     comment = api.subscribe(comment_id, request.user)
     if comment:
         if request.is_ajax():
-            return HttpResponse() # 200 OK
+            return HttpResponse()  # 200 OK
         tcc_index = _get_tcc_index(comment)
         return HttpResponseRedirect(tcc_index)
     raise Http404()
@@ -164,10 +167,11 @@ def unsubscribe(request, comment_id):
     comment = api.unsubscribe(comment_id, request.user)
     if comment:
         if request.is_ajax():
-            return HttpResponse() # 200 OK
+            return HttpResponse()  # 200 OK
         tcc_index = _get_tcc_index(comment)
         return HttpResponseRedirect(tcc_index)
     raise Http404()
+
 
 def content_type_redirect(request, content_type_id, object_pk):
     content_type = ContentType.objects.get_for_id(content_type_id)

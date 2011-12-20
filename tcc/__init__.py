@@ -4,7 +4,9 @@ from tcc.models import Comment
 from tcc.forms import CommentForm
 
 
-# django comment-app api
+  # django comment-app api
+
+
 def get_model():
     return Comment
 
@@ -29,7 +31,9 @@ def get_approve_url(comment):
     return reverse('tcc_approve', args=[comment.id])
 
 
-# extra methods
+  # extra methods
+
+
 def get_unflag_url(comment):
     return reverse('tcc_unflag', args=[comment.id])
 
@@ -40,3 +44,4 @@ def get_undelete_url(comment):
 
 def get_disapprove_url(comment):
     return reverse('tcc_disapprove', args=[comment.id])
+

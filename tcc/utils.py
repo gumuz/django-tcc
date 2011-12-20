@@ -5,6 +5,7 @@ import operator
 
 _CONTENT_TYPES_MAP = None
 
+
 def get_content_types_map():
     global _CONTENT_TYPES_MAP
     if not _CONTENT_TYPES_MAP:
@@ -19,12 +20,15 @@ def get_content_types_map():
             _CONTENT_TYPES_MAP[app][model] = ct.id
     return _CONTENT_TYPES_MAP
 
+
 def get_content_type_id(label):
     return get_content_types_map().get(label)
+
 
 def get_content_types():
     return [v for v in get_content_types_map().itervalues()
         if isinstance(v, (int, long))]
+
 
 def get_content_types_q():
     qs = []
@@ -32,6 +36,6 @@ def get_content_types_q():
         app_label, model = label.split('.')
         qs.append(models.Q(app_label=app_label, model=model))
 
-    # simply does (a | b | c) for qs=[a, b, c]
+  # simply does (a | b | c) for qs=[a, b, c]
     return reduce(operator.or_, qs[1:], qs[0])
 

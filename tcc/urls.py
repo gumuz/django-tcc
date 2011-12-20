@@ -26,3 +26,4 @@ urlpatterns += patterns(
     url(r'^jsi18n/$', 'django.views.i18n.javascript_catalog',
         {'packages': ['tcc']}, name='tcc_jsi18n'),
 )
+

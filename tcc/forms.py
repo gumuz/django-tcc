@@ -23,7 +23,7 @@ class CommentForm(forms.ModelForm):
                     'your comment will be treated as spam'),
         widget=forms.HiddenInput,
     )
-    
+
     def __init__(self, data=None, initial=None, ip=None):
         self.data = data
         self.initial = initial or {}
@@ -78,9 +78,9 @@ class CommentForm(forms.ModelForm):
         expected_hash = self.generate_security_hash(**security_hash_dict)
         actual_hash = self.cleaned_data["security_hash"]
         if not constant_time_compare(expected_hash, actual_hash):
-            # Fallback to Django 1.2 method for compatibility
-            # PendingDeprecationWarning <- here to remind us to remove this
-            # fallback in Django 1.5
+  # Fallback to Django 1.2 method for compatibility
+  # PendingDeprecationWarning <- here to remind us to remove this
+  # fallback in Django 1.5
             expected_hash_old = self._generate_security_hash_old(**security_hash_dict)
             if not constant_time_compare(expected_hash_old, actual_hash):
                 raise forms.ValidationError("Security hash check failed.")
@@ -128,10 +128,9 @@ class CommentForm(forms.ModelForm):
 
     def _generate_security_hash_old(self, content_type, object_pk, timestamp):
         """Generate a (SHA1) security hash from the provided info."""
-        # Django 1.2 compatibility
+  # Django 1.2 compatibility
         info = (content_type, object_pk, timestamp, settings.SECRET_KEY)
         return sha_constructor("".join(info)).hexdigest()
-
 
     class Meta:
         model = Comment

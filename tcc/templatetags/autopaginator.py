@@ -15,26 +15,27 @@ from tcc import settings
 
 register = template.Library()
 
-# Most of the code below is borrowed from the django_pagination module by James Tauber and Pinax Team,
-# http://pinaxproject.com/docs/dev/external/pagination/index.html
+  # Most of the code below is borrowed from the django_pagination module by James Tauber and Pinax Team,
+  # http://pinaxproject.com/docs/dev/external/pagination/index.html
 
 
 class ParentCommentPaginator(Paginator):
+
     def page(self, number):
         "Returns a Page object for the given 1-based page number."
         number = self.validate_number(number)
         if self.count == 0:
             return Page(self.object_list, number, self)
         bottom = (number - 1) * self.per_page
-        # This results in a query to the database ...
+  # This results in a query to the database ...
         bottomdate = self.parentcomments[bottom].sort_date
         try:
-            # This too results in a query to the database ...
+  # This too results in a query to the database ...
             top = self.parentcomments[bottom+self.per_page-1].sort_date
             object_list = self.object_list.filter(sort_date__range=(top, bottomdate))
         except IndexError:
             object_list = self.object_list.filter(sort_date__lte=bottomdate)
-        # And another (final) call to the database 
+  # And another (final) call to the database
         return Page(object_list, number, self)
 
     def _get_count(self):
@@ -44,19 +45,19 @@ class ParentCommentPaginator(Paginator):
                 self.parentcomments = self.object_list.filter(parent__isnull=True)
                 self._count = self.parentcomments.count()
             except (AttributeError, TypeError):
-                # AttributeError if object_list has no count() method.
-                # TypeError if object_list.count() requires arguments
-                # (i.e. is of type list).
+  # AttributeError if object_list has no count() method.
+  # TypeError if object_list.count() requires arguments
+  # (i.e. is of type list).
                 self._count = len(self.object_list)
         return self._count
     count = property(_get_count)
-        
+
 
 class AutopaginateExtension(Extension):
-    """ 
-        Applies pagination to the given dataset (and saves truncated dataset to the context variable), 
+    """
+        Applies pagination to the given dataset (and saves truncated dataset to the context variable),
         sets context variable with data enough to build html for paginator
-        
+
         General syntax:
 
         {% autopaginate dataset [as ctx_variable] %}
@@ -66,6 +67,7 @@ class AutopaginateExtension(Extension):
         original name of the dataset or ctx_variable
     """
     tags = set(['autopaginate'])
+
     default_kwargs = {
         'per_page': settings.PER_PAGE,
         'orphans': settings.PAGE_ORPHANS,
@@ -85,7 +87,7 @@ class AutopaginateExtension(Extension):
             raise TemplateSyntaxError("Cannot determine the name of objects you want to paginate, use 'as foobar' syntax", lineno)
 
 
-        kwargs = [] # wait... what?
+        kwargs = []  # wait... what?
         loops = 0
         while parser.stream.current.type != 'block_end':
             lineno = parser.stream.current.lineno
@@ -99,19 +101,19 @@ class AutopaginateExtension(Extension):
                         ))
             parser.stream.expect('assign')
             value = parser.parse_expression()
-            kwargs.append(nodes.Keyword(key, value)) #.set_lineno(lineno)) # like so?
+            kwargs.append(nodes.Keyword(key, value))  #.set_lineno(lineno))  # like so?
             loops += 1
 
         return [
-            nodes.Assign(nodes.Name(name + '_pages', 'store'), 
+            nodes.Assign(nodes.Name(name + '_pages', 'store'),
                          self.call_method('_render_pages', [object_list, nodes.Name('request', 'load')], kwargs)
             ).set_lineno(lineno),
 
-            nodes.Assign(nodes.Name(name, 'store'), 
+            nodes.Assign(nodes.Name(name, 'store'),
                 nodes.Getattr(nodes.Name(name + '_pages', 'load'), 'object_list', nodes.Impossible())
             ).set_lineno(lineno),
         ]
-        
+
     def _render_pages(self, objs, request, **kwargs):
         mykwargs = self.default_kwargs.copy()
         mykwargs.update(kwargs)
@@ -135,17 +137,17 @@ class AutopaginateExtension(Extension):
                         'False, an HTTP 404 page would have been shown instead.')
 
             page_range = paginator.page_range
-            # Calculate the record range in the current page for display.
+  # Calculate the record range in the current page for display.
             records = {'first': 1 + (page_obj.number - 1) * paginator.per_page}
             records['last'] = records['first'] + paginator.per_page - 1
             if records['last'] + paginator.orphans >= paginator.count:
                 records['last'] = paginator.count
-            # First and last are simply the first *n* pages and the last *n* pages,
-            # where *n* is the current window size.
+  # First and last are simply the first *n* pages and the last *n* pages,
+  # where *n* is the current window size.
             first = set(page_range[:window])
             last = set(page_range[-window:])
-            # Now we look around our current page, making sure that we don't wrap
-            # around.
+  # Now we look around our current page, making sure that we don't wrap
+  # around.
             current_start = page_obj.number-1-window
             if current_start < 0:
                 current_start = 0
@@ -154,8 +156,8 @@ class AutopaginateExtension(Extension):
                 current_end = 0
             current = set(page_range[current_start:current_end])
             pages = []
-            # If there's no overlap between the first set of pages and the current
-            # set of pages, then there's a possible need for elusion.
+  # If there's no overlap between the first set of pages and the current
+  # set of pages, then there's a possible need for elusion.
             if len(first.intersection(current)) == 0:
                 first_list = list(first)
                 first_list.sort()
@@ -163,17 +165,17 @@ class AutopaginateExtension(Extension):
                 second_list.sort()
                 pages.extend(first_list)
                 diff = second_list[0] - first_list[-1]
-                # If there is a gap of two, between the last page of the first
-                # set and the first page of the current set, then we're missing a
-                # page.
+  # If there is a gap of two, between the last page of the first
+  # set and the first page of the current set, then we're missing a
+  # page.
                 if diff == 2:
                     pages.append(second_list[0] - 1)
-                # If the difference is just one, then there's nothing to be done,
-                # as the pages need no elusion and are correct.
+  # If the difference is just one, then there's nothing to be done,
+  # as the pages need no elusion and are correct.
                 elif diff == 1:
                     pass
-                # Otherwise, there's a bigger gap which needs to be signaled for
-                # elusion, by pushing a None value to the page list.
+  # Otherwise, there's a bigger gap which needs to be signaled for
+  # elusion, by pushing a None value to the page list.
                 else:
                     pages.append(None)
                 pages.extend(second_list)
@@ -181,23 +183,23 @@ class AutopaginateExtension(Extension):
                 unioned = list(first.union(current))
                 unioned.sort()
                 pages.extend(unioned)
-            # If there's no overlap between the current set of pages and the last
-            # set of pages, then there's a possible need for elusion.
+  # If there's no overlap between the current set of pages and the last
+  # set of pages, then there's a possible need for elusion.
             if len(current.intersection(last)) == 0:
                 second_list = list(last)
                 second_list.sort()
                 diff = second_list[0] - pages[-1]
-                # If there is a gap of two, between the last page of the current
-                # set and the first page of the last set, then we're missing a 
-                # page.
+  # If there is a gap of two, between the last page of the current
+  # set and the first page of the last set, then we're missing a
+  # page.
                 if diff == 2:
                     pages.append(second_list[0] - 1)
-                # If the difference is just one, then there's nothing to be done,
-                # as the pages need no elusion and are correct.
+  # If the difference is just one, then there's nothing to be done,
+  # as the pages need no elusion and are correct.
                 elif diff == 1:
                     pass
-                # Otherwise, there's a bigger gap which needs to be signaled for
-                # elusion, by pushing a None value to the page list.
+  # Otherwise, there's a bigger gap which needs to be signaled for
+  # elusion, by pushing a None value to the page list.
                 else:
                     pages.append(None)
                 pages.extend(second_list)

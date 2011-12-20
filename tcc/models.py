@@ -22,15 +22,24 @@ SITE_ID = getattr(settings, 'SITE_ID', 1)
 TWO_MINS = timedelta(minutes=2)
 
 
-class Subscribtion(models.Model):
+class Subscription(models.Model):
     user = models.ForeignKey(User)
     comment = models.ForeignKey('Comment')
     read_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    @property
+    def read(self):
+        return bool(self.read_at)
+
+    @property
+    def unread(self):
+        return not self.read
 
     class Meta:
         unique_together = (
             ('user', 'comment'),
         )
+
 
 class Comment(models.Model):
 
@@ -38,12 +47,12 @@ class Comment(models.Model):
 
     '''
 
-    # constants
+  # constants
 
     MAX_REPLIES = tcc_settings.MAX_REPLIES
     REPLY_LIMIT = tcc_settings.REPLY_LIMIT
 
-    # From comments BaseCommentAbstractModel
+  # From comments BaseCommentAbstractModel
     content_type = models.ForeignKey(ContentType,
         verbose_name=_('content type'),
         related_name='content_type_set_for_tcc_comment',
@@ -53,12 +62,12 @@ class Comment(models.Model):
     content_object = generic.GenericForeignKey(ct_field='content_type',
         fk_field='object_pk')
 
-    # The actual comment fields
+  # The actual comment fields
     parent = models.ForeignKey('self', verbose_name=_('Reply to'), null=True,
         blank=True, related_name='children')
     user = models.ForeignKey(User, verbose_name='Commenter')
 
-    # These are here mainly for backwards compatibility
+  # These are here mainly for backwards compatibility
     ip_address = models.IPAddressField()
     user_name = models.CharField(_('user\'s name'), max_length=50, blank=True)
     user_email = models.EmailField(_('user\'s email address'), blank=True)
@@ -66,34 +75,36 @@ class Comment(models.Model):
     submit_date = models.DateTimeField(_('Date'), db_index=True,
         default=datetime.now)
 
-    # Protip: Use postgres...
+  # Protip: Use postgres...
     comment = models.TextField(_('Comment'),
         max_length=tcc_settings.COMMENT_MAX_LENGTH)
     comment_raw = models.TextField(_('Raw Comment'),
         max_length=tcc_settings.COMMENT_MAX_LENGTH)
 
-    # still accepting replies?
+  # still accepting replies?
     is_open = models.BooleanField(_('Open'), default=True)
     is_removed = models.BooleanField(_('Removed'), default=False)
     is_approved = models.BooleanField(_('Approved'),
+
         default=not tcc_settings.MODERATED)
 
-    # is_public is rather pointless icw is_removed?
-    # Keeping it for compatibility w/ contrib.comments
+  # is_public is rather pointless icw is_removed?
+  # Keeping it for compatibility w/ contrib.comments
     is_public = models.BooleanField(_('Public'), default=True)
 
-    # subscription (for notification)
+  # subscription (for notification)
     unsubscribers = models.ManyToManyField(User,
         related_name='thread_unsubscribers')
     subscribers = models.ManyToManyField(
         User,
-        through=Subscribtion,
-        related_name='comment_subscribtions',
+        through=Subscription,
+        related_name='comment_subscriptions',
     )
 
-    # denormalized cache
+  # denormalized cache
     child_count = models.IntegerField(_('Reply count'), default=0)
     sort_date = models.DateTimeField(_('Sortdate'), db_index=True,
+
         default=datetime.now)
     index = models.IntegerField(default=0)
 
@@ -110,11 +121,11 @@ class Comment(models.Model):
         )
 
     def get_subscribers(self):
-        # get all related comments
+  # get all related comments
         comments = self.get_comments_in_thread()
-        # get at most `MAX_REPLIES` and the parent thread
+  # get at most `MAX_REPLIES` and the parent thread
         comments = comments[:tcc_settings.MAX_REPLIES+1]
-        # append the user ids to the list of user_ids
+  # append the user ids to the list of user_ids
         return comments.values_list('user_id', flat=True)
 
     def get_parsed_comment(self, reparse=settings.DEBUG):
@@ -154,7 +165,7 @@ class Comment(models.Model):
         if striptags(comment).strip() == '':
             raise ValidationError(_("This field is required."))
 
-        # Check for identical messages
+  # Check for identical messages
         identical_msgs = Comment.objects.filter(
             user=self.user,
             comment_raw=self.comment,
@@ -180,7 +191,7 @@ class Comment(models.Model):
         else:
             replies = Comment.objects.filter(parent=self)
             if levels:
-                # 'z' is the highest value in base36 (as implemented in django)
+  # 'z' is the highest value in base36 (as implemented in django)
                 replies = replies.filter(index__gte=self.child_count-tcc_settings.REPLY_LIMIT)
 
             if not include_self:
@@ -213,14 +224,14 @@ class Comment(models.Model):
         else:
             is_new = True
 
-            # Make sure we always have a raw comment available
+  # Make sure we always have a raw comment available
             if self.comment_raw is None or self.comment_raw == '':
                 self.comment_raw = self.comment
 
             responses = signals.comment_will_be_posted.send(
                 sender = self.__class__, comment = self)
 
-            # only save the comment if none of the signals return False
+  # only save the comment if none of the signals return False
             for (receiver, response) in responses:
                 if response == False:
                     raise ValidationError(
@@ -228,7 +239,7 @@ class Comment(models.Model):
 
         self.clean()
 
-        # Find the comment index to use
+  # Find the comment index to use
         if is_new:
             comments = self.get_related_comments()
 
@@ -250,16 +261,16 @@ class Comment(models.Model):
 
         super(Comment, self).save(*args, **kwargs)
 
-        # We should have an ID by now
+  # We should have an ID by now
         assert self.id
 
         if is_new:
-            # Sending this signal so *it* can be handled rather than
-            # post_save which is triggered 'too soon': before
-            # self.path is saved.  If there is an exception in a
-            # post_save handler the path is never set and the database
-            # will refuse to save another comment which is quite bad
-            # for a commenting system.
+  # Sending this signal so *it* can be handled rather than
+  # post_save which is triggered 'too soon': before
+  # self.path is saved.  If there is an exception in a
+  # post_save handler the path is never set and the database
+  # will refuse to save another comment which is quite bad
+  # for a commenting system.
             responses = signals.comment_was_posted.send(
                 sender  = self.__class__, comment = self)
 
@@ -304,7 +315,7 @@ class Comment(models.Model):
 
     def reply_allowed(self):
         return self.is_open and self.child_count < self.MAX_REPLIES \
-            and ( self.depth < tcc_settings.MAX_DEPTH - 1 )
+            and (self.depth < tcc_settings.MAX_DEPTH - 1 )
 
     def can_open(self, user):
         return self.user == user
@@ -331,9 +342,9 @@ class Comment(models.Model):
             )
             or user.has_perm('delete', self)
         )
-        # Why always fetch all users if you only need to know if a single
-        # user has remove rights?
-        # >>> user in self.get_enabled_users('remove')
+  # Why always fetch all users if you only need to know if a single
+  # user has remove rights?
+  # >>> user in self.get_enabled_users('remove')
 
     def can_restore(self, user):
         return self.user == user
@@ -348,3 +359,4 @@ class Comment(models.Model):
                           'approve', 'disapprove']
         func = get_callable(tcc_settings.ADMIN_CALLBACK)
         return func(self, action)
+

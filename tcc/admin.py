@@ -1,4 +1,5 @@
 from django.contrib import admin
-# from tcc.models import MyModel
+  # from tcc.models import MyModel
 
-# admin.site.register(MyModel, MyModelAdmin)
+  # admin.site.register(MyModel, MyModelAdmin)
+

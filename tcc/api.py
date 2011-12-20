@@ -16,16 +16,16 @@ def make_tree(comments):
         level = c.depth
         if c.parent:
             while len(levels) > level:
-                levels.pop() # pragma: no cover
+                levels.pop()  # pragma: no cover
             levels.append(c)
-            levels[level-1].replies.append(c)
+            levels[level - 1].replies.append(c)
         else:
             root.append(c)
             levels = [c]
     return root
 
 
-def print_tree(tree): # pragma: no cover
+def print_tree(tree):  # pragma: no cover
     for n in tree:
         print n.id, n.path, n.limit
         print_tree(n.replies)
@@ -40,22 +40,24 @@ def get_comments(content_type_id, object_pk):
 
 
 def get_comments_limited(content_type_id, object_pk):
-    return Comment.limited.select_related(
-        'user', 'userprofile'
-        ).filter(
-        content_type__id=content_type_id,
-        object_pk=object_pk,
+    return (Comment.limited
+        .select_related('user', 'userprofile')
+        .filter(
+            content_type__id=content_type_id,
+            object_pk=object_pk,
+        )
     )
 
 
 def get_comments_as_tree(content_type_id, object_pk):
-    return make_tree(get_comments(content_type_id=content_type_id,
-                                  object_pk=object_pk,
-                                  ))
+    return make_tree(get_comments(
+        content_type_id=content_type_id,
+        object_pk=object_pk,
+    ))
 
 
 def get_comments_limited_as_tree(content_type_id, object_pk):
-    return make_tree( # pragma: no cover
+    return make_tree(  # pragma: no cover
         get_comments_limited(content_type_id=content_type_id,
                              object_pk=object_pk,
                              ))
@@ -78,7 +80,7 @@ def post_comment(content_type_id, object_pk,
         if (not parent) or (not parent.is_open):
             return None
     c = Comment(
-        content_type_id=content_type_id, object_pk=object_pk, 
+        content_type_id=content_type_id, object_pk=object_pk,
         user_id=user_id, comment=comment, parent_id=parent_id, ip_address=ip)
     c.save()
     return c

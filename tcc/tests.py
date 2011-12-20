@@ -47,18 +47,18 @@ class API(TestCase):
         removed = api.get_comments_removed(
             content_type_id=ct.id, object_pk=pk)
         self.assertEqual(len(removed), 1)
-        # restore_comment with wrong user
+  # restore_comment with wrong user
         x = api.restore_comment(c.id, self.user2)
         self.assertTrue(x is None)
         c = api.restore_comment(c.id, self.user1)
         self.assertTrue(c is not None)
         self.assertFalse(c.is_removed)
-        # non-exising comments should return None
+  # non-exising comments should return None
         x = api.restore_comment(-1, self.user1)
         self.assertEqual(x, None)
         x = api.remove_comment(-1, self.user1)
         self.assertEqual(x, None)
-        # remove_comment with wrong user
+  # remove_comment with wrong user
         orgid = c.id
         c = api.remove_comment(orgid, self.user2)
         self.assertTrue(c is None)
@@ -74,13 +74,13 @@ class API(TestCase):
         c = api.post_comment(content_type_id=ct.id, object_pk=pk,
                              user_id=pk, comment="Root message")
         self.assertTrue(c is not None)
-        # wrong user
+  # wrong user
         x = api.approve_comment(c.id, self.user2)
         self.assertTrue(x is None)
         c = api.approve_comment(c.id, self.user1)
         self.assertTrue(c is not None)
         self.assertTrue(c.is_approved)
-        # wrong user
+  # wrong user
         x = api.disapprove_comment(c.id, self.user2)
         self.assertTrue(x is None)
         c = api.disapprove_comment(c.id, self.user1)
@@ -119,7 +119,7 @@ class API(TestCase):
         tc = api.get_comment_thread(c.id)
         self.assertEqual(len(tp), 2)
         self.assertEqual(len(tc), 2)
-        # Non existing parent
+  # Non existing parent
         c = api.post_comment(content_type_id=ct.id, object_pk=pk,
                              user_id=pk, comment="Reply", parent_id=-1)
         self.assertEqual(c, None)
@@ -138,7 +138,7 @@ class API(TestCase):
         tc = api.get_comment_thread(c.id)
         self.assertEqual(len(tp), 2)
         self.assertEqual(len(tc), 2)
-        # Non existing parent
+  # Non existing parent
         c = api.post_reply(user_id=pk, comment="Reply", parent_id=-1)
         self.assertEqual(c, None)
 
@@ -148,7 +148,7 @@ class API(TestCase):
         p = api.post_comment(content_type_id=ct.id, object_pk=pk,
                              user_id=pk, comment="Root message")
         self.assertTrue(p is not None)
-        # wrong user
+  # wrong user
         x = api.open_comment(p.id, self.user2)
         self.assertTrue(x is None)
         p = api.open_comment(p.id, self.user1)
@@ -249,3 +249,4 @@ class ORM(TestCase):
             for __ in range(settings.REPLY_LIMIT+3):
                 c = api.post_reply(user_id=pk, comment="Reply %s%s" % (_, __), parent_id=p.id)
         self.assertEqual(api.get_comments_limited(ct.id, pk).count(), 5*(settings.REPLY_LIMIT+1))
+

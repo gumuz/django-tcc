@@ -32,3 +32,4 @@ def get_comments_for_object(context, object, next=None):
     context.update({'comments': comments, 'form': form})
     return render_to_string('tcc/list-comments.html',
                             context_instance=context)
+

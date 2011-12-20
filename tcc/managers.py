@@ -23,10 +23,11 @@ class ThreadedCommentsQueryCompiler(compiler.SQLCompiler):
         ON other_table.column = table.column
         AND other_table.other_column = table.other_column
     '''
+
     @classmethod
     def _get_table_alias(cls, i):
         '''Returns the table alias
-        
+
         >>> ThreadedCommentsQueryCompiler._get_table_alias(0)
         'sub_0'
         '''
@@ -35,7 +36,7 @@ class ThreadedCommentsQueryCompiler(compiler.SQLCompiler):
     @classmethod
     def _get_column_alias(cls, table, column):
         '''Returns the column alias for the given table/colum.
-        
+
         >>> ThreadedCommentsQueryCompiler._get_column_alias('sub_0', 'test')
         'sub_0_test'
         '''
@@ -46,7 +47,7 @@ class ThreadedCommentsQueryCompiler(compiler.SQLCompiler):
         from_, f_params = super(ThreadedCommentsQueryCompiler, self) \
             .get_from_clause()
 
-        # Add the tables for the subcomments to the from clause
+  # Add the tables for the subcomments to the from clause
         for i in range(settings.REPLY_LIMIT):
             from_.append('''
             LEFT OUTER JOIN %(db_table)s %(alias)s
@@ -63,8 +64,8 @@ class ThreadedCommentsQueryCompiler(compiler.SQLCompiler):
         return from_, f_params
 
 
-# Django doesn't support manual compilers so we add this to the compiler
-# manually
+  # Django doesn't support manual compilers so we add this to the compiler
+  # manually
 compiler.ThreadedCommentsQueryCompiler = ThreadedCommentsQueryCompiler
 
 
@@ -104,6 +105,7 @@ class ThreadedCommentsQuerySet(models.query.QuerySet):
                     object_.subcomments.insert(0, subcomment)
 
             yield object_
+
 
 class CommentsQuerySet(models.query.QuerySet):
 
@@ -155,8 +157,8 @@ class CurrentCommentManager(CommentManager):
     def get_query_set(self, *args, **kwargs):
         qs = super(CurrentCommentManager, self).get_query_set(*args, **kwargs)
         return qs.filter(
-            # for consistent behaviour, always show deleted comments too
-            #is_removed=False,
+  # for consistent behaviour, always show deleted comments too
+  #is_removed=False,
             is_approved=True,
             is_public=True,
             content_type__id__in=get_content_types(),
