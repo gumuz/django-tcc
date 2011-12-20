@@ -130,6 +130,18 @@ def disapprove(request, comment_id):
 
 @login_required
 @require_POST
+def spam(request, comment_id):
+    comment = api.remove_spam_comment(comment_id, request.user)
+    if comment:
+        if request.is_ajax():
+            return HttpResponse() # 200 OK
+        tcc_index = _get_tcc_index(comment)
+        return HttpResponseRedirect(tcc_index)
+    raise Http404()
+
+
+@login_required
+@require_POST
 def remove(request, comment_id):
     comment = api.remove_comment(comment_id, request.user)
     if comment:

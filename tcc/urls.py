@@ -9,6 +9,7 @@ urlpatterns = patterns(
     url(r'^thread/(?P<thread_id>\d+)/$', 'thread', name='tcc_thread'),
     url(r'^post/$', 'post', name='tcc_post'),
     url(r'^remove/(?P<comment_id>\d+)/$', 'remove', name='tcc_remove'),
+    url(r'^spam/(?P<comment_id>\d+)/$', 'spam', name='tcc_spam'),
     url(r'^restore/(?P<comment_id>\d+)/$', 'restore', name='tcc_restore'),
     url(r'^approve/(?P<comment_id>\d+)/$', 'approve', name='tcc_approve'),
     url(r'^disapprove/(?P<comment_id>\d+)/$', 'disapprove',
