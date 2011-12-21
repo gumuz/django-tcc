@@ -2,6 +2,7 @@ from django.db import models
 from tcc.utils import get_content_types
 from tcc import settings
 from django.db.models.sql import compiler
+from entity.static import SPAM_STATUS_CHOICES
 
 quote = lambda s: '"%s"' % s
 
@@ -133,6 +134,18 @@ class CommentsQuerySet(models.query.QuerySet):
 
         return super(CommentsQuerySet, self)._clone(klass=klass,
             setup=setup, **kwargs)
+
+    def mark_as_spam(self):
+        data = {'spam_status': SPAM_STATUS_CHOICES.dict.get('Spam'),
+                'is_checked': True,
+                'is_removed': True}
+        self.update(**data)
+
+    def mark_as_ham(self):
+        data = {'spam_status': SPAM_STATUS_CHOICES.dict.get('Ham'),
+                'is_checked': True,
+                'is_removed': False}
+        self.update(**data)
 
 
 class CommentManager(models.Manager):
