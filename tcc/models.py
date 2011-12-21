@@ -72,7 +72,7 @@ class Comment(models.Model):
     # is_public is rather pointless icw is_removed?
     # Keeping it for compatibility w/ contrib.comments
     is_public = models.BooleanField(_('Public'), default=True)
-    #is_spam = models.BooleanField(_('Spam'), default=False)
+    is_spam = models.BooleanField(_('Spam'), default=False)
     spam_report_count = models.IntegerField(_('Spam reports'), default=0)
 
     # Anti-spam fields
