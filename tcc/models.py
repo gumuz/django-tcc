@@ -11,6 +11,8 @@ from django.template.defaultfilters import striptags
 from django.utils.http import int_to_base36
 from django.utils.translation import ugettext_lazy as _
 
+from entity.static import SPAM_STATUS_CHOICES
+
 from tcc import managers
 from tcc import signals
 from tcc import utils
@@ -70,8 +72,13 @@ class Comment(models.Model):
     # is_public is rather pointless icw is_removed?
     # Keeping it for compatibility w/ contrib.comments
     is_public = models.BooleanField(_('Public'), default=True)
-    is_spam = models.BooleanField(_('Spam'), default=False)
+    #is_spam = models.BooleanField(_('Spam'), default=False)
     spam_report_count = models.IntegerField(_('Spam reports'), default=0)
+
+    # Anti-spam fields
+    spam_status = models.IntegerField(_('Spam status'), max_length=1,
+        choices=SPAM_STATUS_CHOICES, blank=True, null=True) 
+    is_checked = models.BooleanField(_('Checked by humans'))
 
     # subscription (for notification)
     unsubscribers = models.ManyToManyField(User,
@@ -349,6 +356,18 @@ class Comment(models.Model):
                           'approve', 'disapprove']
         func = get_callable(tcc_settings.ADMIN_CALLBACK)
         return func(self, action)
+
+    def mark_as_spam(self):
+        self.spam_status = SPAM_STATUS_CHOICES.dict.get('Spam')
+        self.is_checked = True
+        self.is_removed = True
+        self.save()
+
+    def mark_as_ham(self):
+        self.spam_status = SPAM_STATUS_CHOICES.dict.get('Ham')
+        self.is_checked = True
+        self.is_removed = False
+        self.save()
 
 class SpamReport(models.Model):
     comment = models.ForeignKey(Comment)
