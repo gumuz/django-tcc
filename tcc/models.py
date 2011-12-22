@@ -369,6 +369,16 @@ class Comment(models.Model):
         self.is_removed = False
         self.save()
 
+    def trimmed_content(self, max_length=100):
+        """ Returns the content of the comment, up to max_length characters.
+            Used to display the first part of the comment in the admin
+            interface.
+        """
+        if self.comment_raw[max_length:]:
+            return self.comment_raw[:(max_length - 3)] + '...'
+        else:
+            return self.comment_raw[:max_length]
+
 class SpamReport(models.Model):
     comment = models.ForeignKey(Comment)
     user = models.ForeignKey(User)
