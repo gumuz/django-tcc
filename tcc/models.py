@@ -148,7 +148,7 @@ class Comment(models.Model):
     def __repr__(self):
         return (u'<%s[%d]: at %s by %s: %r>' % (
             self.__class__.__name__,
-            self.id,
+            self.id or 0,
             self.submit_date,
             self.user_name,
             self.comment_raw[:50],
