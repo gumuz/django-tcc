@@ -37,6 +37,12 @@ class Subscription(models.Model):
     def unread(self):
         return not self.read
 
+    def save(self, *args, **kwargs):
+        if self.user_id == self.comment.user_id:
+            self.read_at = self.comment.submit_date or datetime.datetime.now()
+
+        return models.Model.save(self, *args, **kwargs)
+
     class Meta:
         unique_together = (
             ('user', 'comment'),
