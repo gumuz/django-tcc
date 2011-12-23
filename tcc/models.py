@@ -107,8 +107,6 @@ class Comment(models.Model):
     spam_status = models.IntegerField(_('Spam status'), max_length=1,
         choices=SPAM_STATUS_CHOICES, blank=True, null=True) 
     is_checked = models.BooleanField(_('Checked by humans'))
-    akismet_status = models.IntegerField(_('Akismet status'), max_length=1,
-        choices=SPAM_STATUS_CHOICES, blank=True, null=True)
 
     # subscription (for notification)
     unsubscribers = models.ManyToManyField(User,
