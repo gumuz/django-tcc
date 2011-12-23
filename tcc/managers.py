@@ -137,17 +137,25 @@ class CommentsQuerySet(models.query.QuerySet):
         return super(CommentsQuerySet, self)._clone(klass=klass,
             setup=setup, **kwargs)
 
-    def mark_as_spam(self):
+    def mark_as_spam(self, send_to_akismet=True):
         data = {'spam_status': SPAM_STATUS_CHOICES.dict.get('Spam'),
                 'is_checked': True,
                 'is_removed': True}
         self.update(**data)
 
-    def mark_as_ham(self):
+        if send_to_akismet:
+            for comment in self.all():
+                comment.submit_spam()
+
+    def mark_as_ham(self, send_to_akismet=True):
         data = {'spam_status': SPAM_STATUS_CHOICES.dict.get('Ham'),
                 'is_checked': True,
                 'is_removed': False}
         self.update(**data)
+
+        if send_to_akismet:
+            for comment in self.all():
+                comment.submit_ham()
 
 
 class CommentManager(models.Manager):

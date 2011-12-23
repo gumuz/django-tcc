@@ -18,6 +18,7 @@ from tcc import signals
 from tcc import utils
 from tcc import settings as tcc_settings
 from django.utils.safestring import mark_safe
+from akismet import Akismet
 
 SITE_ID = getattr(settings, 'SITE_ID', 1)
 
@@ -242,6 +243,7 @@ class Comment(models.Model):
         '''
         if simple:
             super(Comment, self).save(*args, **kwargs)
+            return
 
         if self.id:
             is_new = False
@@ -392,17 +394,55 @@ class Comment(models.Model):
         func = get_callable(tcc_settings.ADMIN_CALLBACK)
         return func(self, action)
 
-    def mark_as_spam(self):
+    def mark_as_spam(self, send_to_akismet=True):
         self.spam_status = SPAM_STATUS_CHOICES.dict.get('Spam')
         self.is_checked = True
         self.is_removed = True
         self.save()
 
-    def mark_as_ham(self):
+        if send_to_akismet:
+            self.submit_spam()
+
+    def mark_as_ham(self, send_to_akismet=True):
         self.spam_status = SPAM_STATUS_CHOICES.dict.get('Ham')
         self.is_checked = True
         self.is_removed = False
         self.save()
+
+        if send_to_akismet:
+            self.submit_ham()
+
+    def _setup_akismet(self):
+        KEY = getattr(settings, 'AKISMET_KEY')
+        DOMAIN = getattr(settings, 'AKISMET_DOMAIN')
+        api = Akismet(agent='fash_spam_test')
+        api.setAPIKey(KEY, DOMAIN)
+        return api
+        
+
+    def submit_spam(self):
+        """ Report a spam message to Akismet. """
+        api = self._setup_akismet()
+        api.submit_spam(self.comment_raw, self.akismet_data())
+
+
+    def submit_ham(self):
+        """ Report a ham message to Akismet. """
+        api = self._setup_akismet()
+        api.submit_ham(self.comment_raw, self.akismet_data())
+
+
+    def akismet_data(self):
+        """ Returns a dict describing this comment, which is used when
+            submitting it to Akismet.
+        """
+        return {'user_ip': self.ip_address,
+                'user_agent': 'fash_spam_test',
+                'comment_type': 'comment',
+                'comment_author': self.user_name,
+                'comment_author_email': self.user_email,
+                'comment_author_url': self.user_url
+        }
 
     def trimmed_content(self, max_length=100):
         """ Returns the content of the comment, up to max_length characters.
