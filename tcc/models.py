@@ -208,6 +208,7 @@ class Comment(models.Model):
         '''
         if simple:
             super(Comment, self).save(*args, **kwargs)
+            return
 
         if self.id:
             is_new = False
