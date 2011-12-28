@@ -426,12 +426,16 @@ class Comment(models.Model):
     def submit_spam(self):
         """ Report a spam message to Akismet. """
         api = self._setup_akismet()
+        if self.user.is_staff:
+            return
         api.submit_spam(self.comment_raw, self.akismet_data())
 
 
     def submit_ham(self):
         """ Report a ham message to Akismet. """
         api = self._setup_akismet()
+        if self.user.is_staff:
+            return
         api.submit_ham(self.comment_raw, self.akismet_data())
 
 
