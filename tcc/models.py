@@ -101,12 +101,14 @@ class Comment(models.Model):
   # Keeping it for compatibility w/ contrib.comments
     is_public = models.BooleanField(_('Public'), default=True)
     is_spam = models.BooleanField(_('Spam'), default=False)
-    spam_report_count = models.IntegerField(_('Spam reports'), default=0)
+    spam_report_count = models.IntegerField(_('Spam reports'),
+                                            default=0,
+                                            db_index=True)
 
     # Anti-spam fields
     spam_status = models.IntegerField(_('Spam status'), max_length=1,
         choices=SPAM_STATUS_CHOICES, blank=True, null=True) 
-    is_checked = models.BooleanField(_('Checked by humans'))
+    is_checked = models.BooleanField(_('Checked by humans'), db_index=True)
 
     # subscription (for notification)
     unsubscribers = models.ManyToManyField(User,
