@@ -194,6 +194,9 @@ class Comment(models.Model):
         if identical_msgs.count() > 0:
             raise ValidationError(_("You just posted the exact same content."))
 
+        if not self.user.profile.check_comment_limits():
+            raise ValidationError(_("You have posted too many messages today."))
+
     def get_thread(self):
         """ returns the entire 'thread' (a 'root' comment and all replies)
 
