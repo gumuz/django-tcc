@@ -53,6 +53,15 @@ class CommentForm(forms.ModelForm):
             object_pk = self.data['object_pk']
         return object_pk
 
+    def clean(self):
+        """ Check that the user has not posted too many comments today.
+        """
+        data = self.cleaned_data
+        user = data['user']
+        if not user.profile.check_comment_limits():
+            raise forms.ValidationError(_("You have posted too many messages today."))
+        return data
+
     def clean_honeypot(self):
         """Check that nothing's been entered into the honeypot."""
         value = self.cleaned_data["honeypot"]
