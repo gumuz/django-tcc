@@ -128,6 +128,7 @@ class CommentsQuerySet(models.query.QuerySet):
         return qs.extra(select=select).filter(
             parent__isnull=True,
             is_removed=False,
+            spam_status__isnull=False,
         )
 
     def _clone(self, klass=None, setup=False, **kwargs):
