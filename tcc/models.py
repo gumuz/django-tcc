@@ -109,6 +109,8 @@ class Comment(models.Model):
     spam_status = models.IntegerField(_('Spam status'), max_length=1,
         choices=SPAM_STATUS_CHOICES, blank=True, null=True) 
     is_checked = models.BooleanField(_('Checked by humans'), db_index=True)
+    email_sent_at = models.DateTimeField(_('Notifications sent'), blank=True,
+        null=True)
 
     # subscription (for notification)
     unsubscribers = models.ManyToManyField(User,
@@ -435,6 +437,29 @@ class Comment(models.Model):
             return
         api.submit_ham(self.comment_raw, self.akismet_data())
 
+    def check_comment(self):
+        """ Submit the message to Akismet to see if it is ham or spam.
+        """
+        api = self._setup_akismet()
+        is_spam = api.comment_check(self.comment_raw,
+                                    self.akismet_data())
+
+        if is_spam:
+            self.spam_status = SPAM_STATUS_CHOICES.dict.get('Spam')
+            self.is_removed = True
+            self.save()
+        else:
+            self.spam_status = SPAM_STATUS_CHOICES.dict.get('Ham')
+            self.is_removed = False
+            self.save()
+            # Send an email to notify the user they have a new comment
+            if self.content_type_id != 55:
+                # Only send email for comments (not private messages)
+                from threaded_comments import tasks
+                tasks.send_comment_mails.delay(self)
+                
+
+        return is_spam
 
     def akismet_data(self):
         """ Returns a dict describing this comment, which is used when
