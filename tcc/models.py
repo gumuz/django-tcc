@@ -410,6 +410,11 @@ class Comment(models.Model):
         self.is_checked = True
         self.is_removed = False
         self.save()
+        
+        if not self.email_sent_at:
+            # Notification emails have not been sent yet, so send them now
+            from threaded_comments import tasks
+            tasks.send_comment_mails.delay(self)
 
         if send_to_akismet:
             self.submit_ham()

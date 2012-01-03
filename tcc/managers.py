@@ -125,11 +125,23 @@ class CommentsQuerySet(models.query.QuerySet):
                     quote(field.column),
                 )
 
-        return qs.extra(select=select).filter(
+        qs = qs.extra(select=select).filter(
             parent__isnull=True,
             is_removed=False,
-            spam_status__isnull=False,
         )
+
+        # If the akismet_filtering setting is enabled, the queryset should be
+        # further filtered to exclude any messages which have not been checked
+        # for spam yet.
+        try:
+            from gargoyle import gargoyle
+        except ImportError:
+            pass
+        else:
+            if gargoyle.is_active('akismet_filtering'):
+                qs = qs.filter(spam_status__isnull=False)
+
+        return qs
 
     def _clone(self, klass=None, setup=False, **kwargs):
         if klass is None:
