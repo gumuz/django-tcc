@@ -458,10 +458,8 @@ class Comment(models.Model):
             self.is_removed = False
             self.save()
             # Send an email to notify the user they have a new comment
-            if self.content_type_id != 55:
-                # Only send email for comments (not private messages)
-                from threaded_comments import tasks
-                tasks.send_comment_mails.delay(self)
+            from threaded_comments import tasks
+            tasks.send_comment_mails.delay(self)
                 
 
         return is_spam
