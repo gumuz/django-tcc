@@ -30,6 +30,8 @@ class Subscription(models.Model):
     comment = models.ForeignKey('Comment')
     read_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
+    objects = managers.SubscriptionManager()
+
     @property
     def read(self):
         return bool(self.read_at)
@@ -97,8 +99,8 @@ class Comment(models.Model):
 
         default=not tcc_settings.MODERATED)
 
-  # is_public is rather pointless icw is_removed?
-  # Keeping it for compatibility w/ contrib.comments
+    # is_public is rather pointless icw is_removed?
+    # Keeping it for compatibility w/ contrib.comments
     is_public = models.BooleanField(_('Public'), default=True)
     is_spam = models.BooleanField(_('Spam'), default=False)
     spam_report_count = models.IntegerField(_('Spam reports'),
@@ -121,7 +123,7 @@ class Comment(models.Model):
         related_name='comment_subscriptions',
     )
 
-  # denormalized cache
+    # denormalized cache
     child_count = models.IntegerField(_('Reply count'), default=0)
     sort_date = models.DateTimeField(_('Sortdate'), db_index=True,
 
@@ -141,11 +143,11 @@ class Comment(models.Model):
         )
 
     def get_subscribers(self):
-  # get all related comments
+        # get all related comments
         comments = self.get_comments_in_thread()
-  # get at most `MAX_REPLIES` and the parent thread
+        # get at most `MAX_REPLIES` and the parent thread
         comments = comments[:tcc_settings.MAX_REPLIES+1]
-  # append the user ids to the list of user_ids
+        # append the user ids to the list of user_ids
         return comments.values_list('user_id', flat=True)
 
     def get_parsed_comment(self, reparse=settings.DEBUG):
@@ -252,14 +254,14 @@ class Comment(models.Model):
         else:
             is_new = True
 
-  # Make sure we always have a raw comment available
+            # Make sure we always have a raw comment available
             if self.comment_raw is None or self.comment_raw == '':
                 self.comment_raw = self.comment
 
             responses = signals.comment_will_be_posted.send(
                 sender = self.__class__, comment = self)
 
-  # only save the comment if none of the signals return False
+            # only save the comment if none of the signals return False
             for (receiver, response) in responses:
                 if response == False:
                     raise ValidationError(
@@ -267,7 +269,7 @@ class Comment(models.Model):
 
         self.clean()
 
-  # Find the comment index to use
+        # Find the comment index to use
         if is_new:
             comments = self.get_related_comments()
 
@@ -289,16 +291,16 @@ class Comment(models.Model):
 
         super(Comment, self).save(*args, **kwargs)
 
-  # We should have an ID by now
+        # We should have an ID by now
         assert self.id
 
         if is_new:
-  # Sending this signal so *it* can be handled rather than
-  # post_save which is triggered 'too soon': before
-  # self.path is saved.  If there is an exception in a
-  # post_save handler the path is never set and the database
-  # will refuse to save another comment which is quite bad
-  # for a commenting system.
+            # Sending this signal so *it* can be handled rather than
+            # post_save which is triggered 'too soon': before
+            # self.path is saved.  If there is an exception in a
+            # post_save handler the path is never set and the database
+            # will refuse to save another comment which is quite bad
+            # for a commenting system.
             responses = signals.comment_was_posted.send(
                 sender  = self.__class__, comment = self)
 

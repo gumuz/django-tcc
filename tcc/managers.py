@@ -1,5 +1,5 @@
 from django.db import models
-from tcc.utils import get_content_types
+from tcc.utils import get_content_types, get_content_type_id
 from tcc import settings
 from django.db.models.sql import compiler
 from entity.static import SPAM_STATUS_CHOICES
@@ -109,9 +109,23 @@ class ThreadedCommentsQuerySet(models.query.QuerySet):
 
 
 class CommentsQuerySet(models.query.QuerySet):
+    def checked(self):
+        # If the akismet_filtering setting is enabled, the queryset should be
+        # further filtered to exclude any messages which have not been checked
+        # for spam yet.
+        qs = self._clone(setup=True)
+        try:
+            from gargoyle import gargoyle
+        except ImportError:
+            pass
+        else:
+            if gargoyle.is_active('akismet_filtering'):
+                qs = qs.filter(spam_status__isnull=False)
+
+        return qs
 
     def threaded(self):
-        qs = self._clone(klass=ThreadedCommentsQuerySet, setup=True)
+        qs = self.checked()._clone(klass=ThreadedCommentsQuerySet, setup=True)
         select = {}
         for i in range(settings.REPLY_LIMIT):
             alias = ThreadedCommentsQueryCompiler._get_table_alias(i)
@@ -130,17 +144,6 @@ class CommentsQuerySet(models.query.QuerySet):
             is_removed=False,
         )
 
-        # If the akismet_filtering setting is enabled, the queryset should be
-        # further filtered to exclude any messages which have not been checked
-        # for spam yet.
-        try:
-            from gargoyle import gargoyle
-        except ImportError:
-            pass
-        else:
-            if gargoyle.is_active('akismet_filtering'):
-                qs = qs.filter(spam_status__isnull=False)
-
         return qs
 
     def _clone(self, klass=None, setup=False, **kwargs):
@@ -154,7 +157,7 @@ class CommentsQuerySet(models.query.QuerySet):
         data = {'spam_status': SPAM_STATUS_CHOICES.dict.get('Spam'),
                 'is_checked': True,
                 'is_removed': True}
-        self.update(**data)
+        self.exclude(**data).update(**data)
 
         if send_to_akismet:
             for comment in self.all():
@@ -164,7 +167,7 @@ class CommentsQuerySet(models.query.QuerySet):
         data = {'spam_status': SPAM_STATUS_CHOICES.dict.get('Ham'),
                 'is_checked': True,
                 'is_removed': False}
-        self.update(**data)
+        self.exclude(**data).update(**data)
 
         if send_to_akismet:
             for comment in self.all():
@@ -176,9 +179,28 @@ class CommentManager(models.Manager):
     def get_query_set(self):
         return CommentsQuerySet(self.model, using=self._db)
 
-    def threaded(self):
-        return self.get_query_set(self).threaded()
+    def checked(self):
+        return self.get_query_set().checked()
 
+    def threaded(self):
+        return self.get_query_set().threaded()
+
+    def private_message(self, message_id, user):
+        qs = self.get_query_set().filter(
+            content_type=get_content_type_id('user.profile'),
+            pk=message_id,
+            subscription__user=user,
+        )
+        qs = (
+            qs.filter(
+                spam_status__isnull=False,
+                is_removed=False,
+            )
+            | qs.filter(
+                user=user
+            )
+        )
+        return qs
 
 class CurrentCommentManager(CommentManager):
     """ Returns only approved comments that are not (marked as) removed
@@ -191,8 +213,8 @@ class CurrentCommentManager(CommentManager):
     def get_query_set(self, *args, **kwargs):
         qs = super(CurrentCommentManager, self).get_query_set(*args, **kwargs)
         return qs.filter(
-  # for consistent behaviour, always show deleted comments too
-  #is_removed=False,
+            # for consistent behaviour, always show deleted comments too
+            #is_removed=False,
             is_approved=True,
             is_public=True,
             content_type__id__in=get_content_types(),
@@ -228,4 +250,25 @@ class DisapprovedCommentManager(models.Manager):
         return super(DisapprovedCommentManager, self).get_query_set(
             *args, **kwargs).filter(
             is_removed=False, is_approved=False)
+
+class SubscriptionManager(models.Manager):
+    def visible(self, user):
+        qs = self.get_query_set()
+
+        qs = (qs
+            .order_by('-comment__sort_date')
+            .filter(user=user)
+        )
+
+        qs = (
+            qs.filter(
+                comment__spam_status__isnull=False,
+                comment__is_removed=False,
+            )
+            | qs.filter(
+                comment__user=user
+            )
+        )
+
+        return qs
 
