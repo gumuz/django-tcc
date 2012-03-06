@@ -90,9 +90,11 @@ def post(request):
             mimetype='application/json',
         )
     else:
+        content_type_id = data.get('content_type_id',
+            data.get('content_type'))
         return content_type_redirect(
             request,
-            content_type_id=data.get('content_type_id'),
+            content_type_id=content_type_id,
             object_pk=data.get('object_pk'),
         )
 
