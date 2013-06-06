@@ -26,7 +26,7 @@ TWO_MINS = timedelta(minutes=2)
 
 
 class Subscription(models.Model):
-    user = models.ForeignKey(User)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL)
     comment = models.ForeignKey('Comment')
     read_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
@@ -76,7 +76,7 @@ class Comment(models.Model):
   # The actual comment fields
     parent = models.ForeignKey('self', verbose_name=_('Reply to'), null=True,
         blank=True, related_name='children')
-    user = models.ForeignKey(User, verbose_name='Commenter')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name='Commenter')
 
   # These are here mainly for backwards compatibility
     ip_address = models.IPAddressField()
@@ -490,7 +490,7 @@ class Comment(models.Model):
 
 class SpamReport(models.Model):
     comment = models.ForeignKey(Comment)
-    user = models.ForeignKey(User)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL)
 
     class Meta:
         unique_together = ['user', 'comment']
